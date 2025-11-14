@@ -1,0 +1,40 @@
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
+
+const Galeries: React.FC = () => {
+  // Reuse hero fallbacks (local first, then remote)
+  const heroSources = [
+    '/galeries.jpg',
+    '/galeries.png',
+    '/galeries.webp',
+    'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?q=80&w=1600&auto=format&fit=crop' // gallery/editorial fallback
+  ];
+  const [heroIndex, setHeroIndex] = useState(0);
+
+  return (
+    <div className="min-h-screen bg-beige text-charcoal">
+      {/* Full-bleed hero background */}
+      <section className="relative mb-10 overflow-hidden">
+        <div className="relative h-[52vh] min-h-[360px] w-full">
+          <img
+            src={heroSources[heroIndex]}
+            alt="Galeries Hero"
+            className="absolute inset-0 w-full h-full object-cover"
+            onError={() => setHeroIndex(i => Math.min(i + 1, heroSources.length - 1))}
+          />
+          <div className="absolute inset-0 bg-royal/35" />
+          <div className="relative z-10 h-full flex flex-col items-center justify-center text-center px-6">
+            <h1 className="text-4xl md:text-5xl font-serif font-semibold tracking-tight text-white">Galeries</h1>
+          </div>
+        </div>
+      </section>
+
+      <div className="container mx-auto max-w-content px-4 sm:px-6 lg:px-8 pb-10">
+        <p className="text-slate mb-8">Parcourez nos galeries d’images, campagnes et inspirations visuelles.</p>
+        <Link to="/" className="px-4 py-2 rounded-md border border-charcoal/20 text-charcoal hover:bg-charcoal/5 transition">Retour à l’accueil</Link>
+      </div>
+    </div>
+  );
+};
+
+export default Galeries;

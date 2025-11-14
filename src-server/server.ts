@@ -1,11 +1,15 @@
 import express from 'express';
 import path from 'path';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import 'dotenv/config';
 import { fileURLToPath } from 'url';
 
 import productRoutes from './api/produits.js';
+import authRoutes from './api/auth.js';
+import orderRoutes from './api/orders.js';
+import adminRoutes from './api/admin.js';
 import { logger } from './config/logger.js';
 
 // ES Module equivalent of __dirname
@@ -16,30 +20,33 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 
 // === Configuration des Middlewares ===
-app.use(cors());
+app.use(cors({ origin: 'http://localhost:3000', credentials: true }));
 app.use(helmet());
 app.use(express.json());
+app.use(cookieParser());
 
 // === Routes de l'API ===
 app.get('/health', (req, res) => {
   res.status(200).send('OK');
 });
 app.use('/api/produits', productRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/orders', orderRoutes);
+app.use('/api/admin', adminRoutes);
 
 // === Service des Fichiers Statiques (Frontend React) ===
-// Détermine le chemin vers les sources du client et la racine du projet
-const srcPath = path.resolve(__dirname, '../../src');
+// En développement, utiliser Vite (npm run dev:client). En production, servir le build.
 const rootPath = path.resolve(__dirname, '../../');
+const distPath = path.resolve(__dirname, '../../dist');
 
-// Sert les fichiers du dossier 'src' (ex: /components/Header.tsx)
-// Permet au navigateur de charger les modules JS/TSX demandés par index.html
-app.use(express.static(srcPath));
-
-// Pour toute autre requête GET qui n'est pas une route API, renvoyer l'index.html.
-// Cela permet au routeur côté client de React (SPA) de prendre le relais.
-app.get('*', (req, res) => {
-  res.sendFile(path.join(rootPath, 'index.html'));
-});
+if (process.env.NODE_ENV === 'production') {
+  // Sert les assets construits par Vite
+  app.use(express.static(distPath));
+  // Pour toute route non API, renvoyer le index.html du build
+  app.get('*', (_req, res) => {
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
+}
 
 // === Démarrage du Serveur ===
 app.listen(PORT, () => {
