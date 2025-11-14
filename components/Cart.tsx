@@ -1,7 +1,7 @@
 import React from 'react';
 import { CartItem } from '../types.ts';
 import { CloseIcon, TrashIcon } from './Icons.tsx';
-import { formatCurrency } from '/utils/formatter.ts';
+import { formatCurrency } from '../src/utils/formatter.ts';
 
 interface CartProps {
   isOpen: boolean;
@@ -24,7 +24,7 @@ const Cart: React.FC<CartProps> = ({ isOpen, onClose, items, onUpdateQuantity, o
         aria-hidden="true"
       ></div>
       <div
-        className={`fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out ${
+        className={`fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-soft z-50 transform transition-transform duration-300 ease-premium ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
         role="dialog"
@@ -42,7 +42,7 @@ const Cart: React.FC<CartProps> = ({ isOpen, onClose, items, onUpdateQuantity, o
           {items.length === 0 ? (
             <div className="flex-grow flex flex-col items-center justify-center text-center p-6">
               <p className="text-lg text-gray-500">Votre panier est vide.</p>
-              <button onClick={onClose} className="mt-4 px-6 py-2 bg-primary-600 text-white font-semibold rounded-md hover:bg-primary-700 transition-colors">
+              <button onClick={onClose} className="mt-4 btn-primary">
                 Continuer les achats
               </button>
             </div>
@@ -68,7 +68,7 @@ const Cart: React.FC<CartProps> = ({ isOpen, onClose, items, onUpdateQuantity, o
                            <button onClick={() => onUpdateQuantity(item.product.id, item.quantity + 1)} className="px-2 py-1 text-gray-500 hover:text-gray-700" aria-label="Augmenter la quantité">+</button>
                         </div>
                         <div className="flex">
-                          <button onClick={() => onRemove(item.product.id)} type="button" className="font-medium text-primary-600 hover:text-primary-500" aria-label="Supprimer l'article">
+                          <button onClick={() => onRemove(item.product.id)} type="button" className="font-medium text-accent hover:opacity-90" aria-label="Supprimer l'article">
                             <TrashIcon className="h-5 w-5"/>
                           </button>
                         </div>
@@ -86,10 +86,10 @@ const Cart: React.FC<CartProps> = ({ isOpen, onClose, items, onUpdateQuantity, o
                 <p>Sous-total</p>
                 <p>{formatCurrency(subtotal)}</p>
               </div>
-              <p className="mt-1 text-sm text-gray-500">Frais de port et taxes calculés à la caisse.</p>
+              <p className="mt-2 text-sm text-slate-600">Frais de port et taxes calculés à la caisse. Paiement sécurisé. Retours offerts sous 14 jours.</p>
               <div className="mt-6">
-                <a href="#" className="flex items-center justify-center rounded-md border border-transparent bg-primary-600 px-6 py-3 text-base font-medium text-white shadow-sm hover:bg-primary-700 transition-colors">
-                  Paiement
+                <a href="#" className="flex items-center justify-center rounded-md border border-transparent btn-primary px-6 py-3 text-base font-medium">
+                  Passer au paiement
                 </a>
               </div>
             </div>

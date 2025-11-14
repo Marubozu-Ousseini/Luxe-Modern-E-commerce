@@ -42,3 +42,21 @@ export const BackArrowIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) =>
         <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
     </svg>
 );
+
+export const UserIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
+    <path fillRule="evenodd" d="M12 2.25a5.25 5.25 0 0 0-2.99 9.57c-3.77.86-6.76 4.2-6.76 8.18 0 .414.336.75.75.75h18a.75.75 0 0 0 .75-.75c0-3.98-2.99-7.32-6.76-8.18A5.25 5.25 0 0 0 12 2.25Zm0 1.5a3.75 3.75 0 1 1 0 7.5 3.75 3.75 0 0 1 0-7.5Z" clipRule="evenodd" />
+  </svg>
+);
+
+export const OrdersIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
+    <path d="M6 2.25A2.25 2.25 0 0 0 3.75 4.5v15A2.25 2.25 0 0 0 6 21.75h12A2.25 2.25 0 0 0 20.25 19.5v-15A2.25 2.25 0 0 0 18 2.25H6Zm2.25 4.5a.75.75 0 0 1 .75-.75h6a.75.75 0 0 1 0 1.5h-6a.75.75 0 0 1-.75-.75Zm0 3.75a.75.75 0 0 1 .75-.75h6a.75.75 0 0 1 0 1.5h-6a.75.75 0 0 1-.75-.75Zm0 3.75a.75.75 0 0 1 .75-.75h3a.75.75 0 0 1 0 1.5h-3a.75.75 0 0 1-.75-.75Z" />
+  </svg>
+);
+
+export const HeartIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
+    <path d="M11.645 20.91a.75.75 0 0 0 .71 0c1.71-.97 3.262-2.046 4.634-3.235 1.42-1.223 2.618-2.565 3.478-3.977.86-1.413 1.383-2.942 1.383-4.518 0-2.7-2.02-4.68-4.5-4.68-1.54 0-2.94.81-3.705 2.063-.18.295-.63.295-.81 0-.765-1.253-2.165-2.063-3.705-2.063-2.48 0-4.5 1.98-4.5 4.68 0 1.576.523 3.105 1.383 4.518.86 1.412 2.058 2.754 3.478 3.977 1.372 1.189 2.924 2.265 4.634 3.235Z" />
+  </svg>
+);

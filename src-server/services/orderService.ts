@@ -1,0 +1,67 @@
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import type { Product } from '../../types.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const dataDir = path.resolve(__dirname, '../../data');
+const ordersFile = path.join(dataDir, 'orders.json');
+
+export interface OrderItem {
+  productId: number;
+  quantity: number;
+  price: number; // snapshot price
+}
+
+export interface OrderRecord {
+  id: string;
+  userId: string;
+  items: OrderItem[];
+  total: number;
+  currency: 'XAF';
+  status: 'paid' | 'pending' | 'failed';
+  createdAt: string;
+}
+
+function ensureDataDir() {
+  if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+  if (!fs.existsSync(ordersFile)) fs.writeFileSync(ordersFile, '[]');
+}
+
+function readOrders(): OrderRecord[] {
+  ensureDataDir();
+  const raw = fs.readFileSync(ordersFile, 'utf-8');
+  return JSON.parse(raw);
+}
+
+function writeOrders(orders: OrderRecord[]) {
+  ensureDataDir();
+  fs.writeFileSync(ordersFile, JSON.stringify(orders, null, 2));
+}
+
+export function createOrder(userId: string, products: Product[], cart: { productId: number; quantity: number }[]): OrderRecord {
+  const items: OrderItem[] = cart.map(({ productId, quantity }) => {
+    const product = products.find(p => p.id === productId);
+    if (!product) throw new Error(`Produit introuvable: ${productId}`);
+    return { productId, quantity, price: product.price };
+  });
+  const total = items.reduce((sum, it) => sum + it.price * it.quantity, 0);
+  const order: OrderRecord = {
+    id: String(Date.now()),
+    userId,
+    items,
+    total,
+    currency: 'XAF',
+    status: 'paid', // simulé
+    createdAt: new Date().toISOString(),
+  };
+  const all = readOrders();
+  all.push(order);
+  writeOrders(all);
+  return order;
+}
+
+export function getOrdersByUser(userId: string): OrderRecord[] {
+  return readOrders().filter(o => o.userId === userId);
+}

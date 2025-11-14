@@ -1,7 +1,7 @@
 import React from 'react';
 import { Product } from '../types.ts';
 import ProductCard from './ProductCard.tsx';
-import { formatCurrency } from '/utils/formatter.ts';
+import { formatCurrency } from '../src/utils/formatter.ts';
 
 interface ProductListProps {
   products: Product[];
@@ -20,7 +20,7 @@ const ProductList: React.FC<ProductListProps> = ({ products, onProductSelect, on
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 md:gap-10">
       {products.map(product => (
         <ProductCard
           key={product.id}
