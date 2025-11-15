@@ -156,7 +156,7 @@ const App: React.FC = () => {
         onUpdateQuantity={handleUpdateQuantity}
         onRemove={handleRemoveFromCart}
       />
-      <main className="container mx-auto max-w-content px-4 sm:px-6 lg:px-8 py-10">
+      <main className={`container mx-auto max-w-content px-4 sm:px-6 lg:px-8 ${selectedProduct ? 'py-10' : 'pt-0 pb-10'}`}>
         {selectedProduct ? (
           <ProductDetail
             product={selectedProduct}
@@ -165,16 +165,15 @@ const App: React.FC = () => {
           />
         ) : (
           <>
-            {/* Hero: full-bleed image with royal overlay */}
-            <section className="relative mb-12 md:mb-16 overflow-hidden rounded-lg shadow-soft">
-              <div className="relative h-[52vh] min-h-[360px] w-full">
+            {/* Hero: full-screen width and height (minus header) */}
+            <section className="relative -mx-[50vw] left-1/2 right-1/2 w-screen mb-8 overflow-hidden">
+              <div className="relative h-[calc(100vh-4rem)] min-h-[calc(100vh-4rem)] w-full">
                 <img
                   src={heroSources[heroIndex]}
                   alt="Hero"
                   className="absolute inset-0 w-full h-full object-cover"
                   onError={() => setHeroIndex(i => Math.min(i + 1, heroSources.length - 1))}
                 />
-                <div className="absolute inset-0 bg-royal/35" />
                 <div className="relative z-10 h-full flex flex-col items-center justify-center text-center px-6">
                   <h1 className="text-4xl md:text-5xl font-serif font-semibold tracking-tight text-white">L'Édition Saisonnière</h1>
                   {/* Subtitle removed per request */}
