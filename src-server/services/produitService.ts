@@ -113,6 +113,47 @@ export async function getAllProductsAsync(): Promise<Product[]> {
   }));
 }
 
+export function getProducts(opts?: { q?: string; limit?: number; offset?: number }): Product[] {
+  const { q, limit, offset } = opts || {};
+  let list = [...products];
+  if (q) {
+    const ql = q.toLowerCase();
+    list = list.filter(p => p.name.toLowerCase().includes(ql) || p.description.toLowerCase().includes(ql) || p.category.toLowerCase().includes(ql));
+  }
+  const start = Math.max(0, offset || 0);
+  const end = limit ? start + limit : undefined;
+  return list.slice(start, end);
+}
+
+export async function getProductsAsync(opts?: { q?: string; limit?: number; offset?: number }): Promise<Product[]> {
+  if (!isDbAvailable()) return getProducts(opts);
+  const clauses: string[] = [];
+  const values: any[] = [];
+  let i = 1;
+  if (opts?.q) {
+    clauses.push('(lower(name) LIKE $' + i + ' OR lower(description) LIKE $' + i + ' OR lower(category) LIKE $' + i + ')');
+    values.push(`%${opts.q.toLowerCase()}%`);
+    i++;
+  }
+  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+  let sql = `SELECT id, name, price, original_price as "originalPrice", description, category, image_url as "imageUrl", stock, limited_availability as "limitedAvailability", rating_rate as "ratingRate", rating_count as "ratingCount" FROM products ${where} ORDER BY id ASC`; 
+  if (opts?.limit) { sql += ` LIMIT $${i++}`; values.push(opts.limit); }
+  if (opts?.offset) { sql += ` OFFSET $${i++}`; values.push(opts.offset); }
+  const { rows } = await query<any>(sql, values);
+  return rows.map(r => ({
+    id: r.id,
+    name: r.name,
+    price: r.price,
+    originalPrice: r.originalPrice ?? undefined,
+    description: r.description,
+    category: r.category,
+    imageUrl: r.imageUrl,
+    stock: r.stock ?? 0,
+    limitedAvailability: r.limitedAvailability || undefined,
+    rating: { rate: Number(r.ratingRate || 0), count: Number(r.ratingCount || 0) }
+  }));
+}
+
 export function addProduct(newProduct: Omit<Product, 'id' | 'rating'> & { rating?: Product['rating'] }): Product {
   const id = Math.max(0, ...products.map(p => p.id)) + 1;
   const product: Product = { id, rating: newProduct.rating || { rate: 0, count: 0 }, stock: newProduct.stock ?? 0, ...newProduct };
