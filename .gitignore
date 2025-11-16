@@ -12,6 +12,13 @@ dist
 dist-ssr
 *.local
 
+# Terraform local state & providers
+infra/terraform/.terraform/
+*.tfstate*
+
+# Drizzle generated migrations output directory (if created)
+drizzle/migrations
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -25,3 +32,4 @@ dist-ssr
 
 # Environment
 .env
+.env.*
