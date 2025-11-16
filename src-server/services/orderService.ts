@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { query, isDbAvailable } from './db.js';
 import type { Product } from '../../types.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -78,4 +79,47 @@ export function updateOrderStatus(id: string, status: OrderRecord['status']): Or
   orders[idx].status = status;
   writeOrders(orders);
   return orders[idx];
+}
+
+// === Async DB-backed variants ===
+export async function createOrderAsync(userId: string, products: Product[], cart: { productId: number; quantity: number }[]): Promise<OrderRecord> {
+  if (!isDbAvailable()) return createOrder(userId, products, cart);
+  const items: OrderItem[] = cart.map(({ productId, quantity }) => {
+    const product = products.find(p => p.id === productId);
+    if (!product) throw new Error(`Produit introuvable: ${productId}`);
+    return { productId, quantity, price: product.price };
+  });
+  const total = items.reduce((sum, it) => sum + it.price * it.quantity, 0);
+  const order: OrderRecord = {
+    id: String(Date.now()),
+    userId,
+    items,
+    total,
+    currency: 'XAF',
+    status: 'paid',
+    createdAt: new Date().toISOString(),
+  };
+  await query('INSERT INTO orders (id, user_id, total, currency, status, created_at) VALUES ($1,$2,$3,$4,$5,$6)', [order.id, userId, total, order.currency, order.status, order.createdAt]);
+  for (const it of items) {
+    await query('INSERT INTO order_items (order_id, product_id, quantity, price) VALUES ($1,$2,$3,$4)', [order.id, it.productId, it.quantity, it.price]);
+  }
+  return order;
+}
+
+export async function getOrdersByUserAsync(userId: string): Promise<OrderRecord[]> {
+  if (!isDbAvailable()) return getOrdersByUser(userId);
+  const { rows } = await query<any>('SELECT id, user_id as "userId", total, currency, status, created_at as "createdAt" FROM orders WHERE user_id=$1 ORDER BY created_at DESC', [userId]);
+  return rows;
+}
+
+export async function getAllOrdersAsync(): Promise<OrderRecord[]> {
+  if (!isDbAvailable()) return getAllOrders();
+  const { rows } = await query<any>('SELECT id, user_id as "userId", total, currency, status, created_at as "createdAt" FROM orders ORDER BY created_at DESC');
+  return rows;
+}
+
+export async function updateOrderStatusAsync(id: string, status: OrderRecord['status']): Promise<OrderRecord | undefined> {
+  if (!isDbAvailable()) return updateOrderStatus(id, status);
+  const { rows } = await query<any>('UPDATE orders SET status=$2 WHERE id=$1 RETURNING id, user_id as "userId", total, currency, status, created_at as "createdAt"', [id, status]);
+  return rows[0];
 }

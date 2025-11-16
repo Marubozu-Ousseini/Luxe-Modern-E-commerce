@@ -2,6 +2,7 @@
 // Pour l'instant, il renvoie des données statiques.
 
 import type { Product } from '../../types.js'; // Types partagés (NodeNext: utiliser l'extension .js côté import)
+import { query, isDbAvailable } from './db.js';
 
 const products: Product[] = [
     {
@@ -95,11 +96,46 @@ export function getAllProducts(): Product[] {
     return products;
 }
 
+export async function getAllProductsAsync(): Promise<Product[]> {
+  if (!isDbAvailable()) return getAllProducts();
+  const { rows } = await query<any>('SELECT id, name, price, original_price as "originalPrice", description, category, image_url as "imageUrl", stock, limited_availability as "limitedAvailability", rating_rate as "ratingRate", rating_count as "ratingCount" FROM products ORDER BY id ASC');
+  return rows.map(r => ({
+    id: r.id,
+    name: r.name,
+    price: r.price,
+    originalPrice: r.originalPrice ?? undefined,
+    description: r.description,
+    category: r.category,
+    imageUrl: r.imageUrl,
+    stock: r.stock ?? 0,
+    limitedAvailability: r.limitedAvailability || undefined,
+    rating: { rate: Number(r.ratingRate || 0), count: Number(r.ratingCount || 0) }
+  }));
+}
+
 export function addProduct(newProduct: Omit<Product, 'id' | 'rating'> & { rating?: Product['rating'] }): Product {
   const id = Math.max(0, ...products.map(p => p.id)) + 1;
   const product: Product = { id, rating: newProduct.rating || { rate: 0, count: 0 }, stock: newProduct.stock ?? 0, ...newProduct };
   products.push(product);
   return product;
+}
+
+export async function addProductAsync(newProduct: Omit<Product, 'id' | 'rating'> & { rating?: Product['rating'] }): Promise<Product> {
+  if (!isDbAvailable()) return addProduct(newProduct);
+  const result = await query<any>('INSERT INTO products (name, price, original_price, description, category, image_url, stock, limited_availability, rating_rate, rating_count) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id', [
+    newProduct.name,
+    newProduct.price,
+    newProduct.originalPrice ?? null,
+    newProduct.description,
+    newProduct.category,
+    newProduct.imageUrl,
+    newProduct.stock ?? 0,
+    newProduct.limitedAvailability ?? false,
+    newProduct.rating?.rate ?? 0,
+    newProduct.rating?.count ?? 0,
+  ]);
+  const id = result.rows[0].id;
+  return { id, rating: newProduct.rating || { rate: 0, count: 0 }, ...newProduct };
 }
 
 export function updateProduct(id: number, updates: Partial<Omit<Product, 'id'>>): Product | undefined {
@@ -109,9 +145,46 @@ export function updateProduct(id: number, updates: Partial<Omit<Product, 'id'>>)
   return products[idx];
 }
 
+export async function updateProductAsync(id: number, updates: Partial<Omit<Product, 'id'>>): Promise<Product | undefined> {
+  if (!isDbAvailable()) return updateProduct(id, updates);
+  // Build dynamic SET clause
+  const fields: string[] = [];
+  const values: any[] = [];
+  let i = 1;
+  const map: Record<string, any> = {
+    name: updates.name,
+    price: updates.price,
+    original_price: updates.originalPrice,
+    description: updates.description,
+    category: updates.category,
+    image_url: updates.imageUrl,
+    stock: updates.stock,
+    limited_availability: updates.limitedAvailability,
+  };
+  for (const [col, val] of Object.entries(map)) {
+    if (val !== undefined) { fields.push(`${col}=$${i++}`); values.push(val); }
+  }
+  if (fields.length === 0) {
+    const all = await getAllProductsAsync();
+    return all.find(p => p.id === id);
+  }
+  values.push(id);
+  const sql = `UPDATE products SET ${fields.join(', ')} WHERE id=$${i} RETURNING id`;
+  const res = await query<any>(sql, values);
+  if (!res.rows[0]) return undefined;
+  const all = await getAllProductsAsync();
+  return all.find(p => p.id === id);
+}
+
 export function deleteProduct(id: number): boolean {
   const idx = products.findIndex(p => p.id === id);
   if (idx === -1) return false;
   products.splice(idx, 1);
   return true;
+}
+
+export async function deleteProductAsync(id: number): Promise<boolean> {
+  if (!isDbAvailable()) return deleteProduct(id);
+  const res = await query<any>('DELETE FROM products WHERE id=$1 RETURNING id', [id]);
+  return !!res.rows[0];
 }
