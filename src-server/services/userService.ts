@@ -58,3 +58,32 @@ export function createUser(name: string, email: string, password: string, role: 
 export function verifyPassword(password: string, passwordHash: string): boolean {
   return bcrypt.compareSync(password, passwordHash);
 }
+
+export function createUserIfNotExists(name: string, email: string, password: string, role: Role = 'user'): UserRecord {
+  const existing = findUserByEmail(email);
+  if (existing) return existing;
+  return createUser(name, email, password, role);
+}
+
+export function setUserRole(email: string, role: Role): UserRecord | undefined {
+  const users = readUsers();
+  const idx = users.findIndex(u => u.email.toLowerCase() === email.toLowerCase());
+  if (idx === -1) return undefined;
+  users[idx].role = role;
+  writeUsers(users);
+  return users[idx];
+}
+
+export function setUserPassword(email: string, newPassword: string): UserRecord | undefined {
+  const users = readUsers();
+  const idx = users.findIndex(u => u.email.toLowerCase() === email.toLowerCase());
+  if (idx === -1) return undefined;
+  users[idx].passwordHash = bcrypt.hashSync(newPassword, 10);
+  writeUsers(users);
+  return users[idx];
+}
+
+// Admin helpers (sanitize before returning)
+export function getAllUsersSanitized(): Omit<UserRecord, 'passwordHash'>[] {
+  return readUsers().map(({ passwordHash, ...rest }) => rest);
+}
