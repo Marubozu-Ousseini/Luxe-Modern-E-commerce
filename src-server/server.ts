@@ -12,6 +12,7 @@ import productRoutes from './api/produits.js';
 import authRoutes from './api/auth.js';
 import orderRoutes from './api/orders.js';
 import adminRoutes from './api/admin.js';
+import paymentsRoutes, { stripeWebhookRouter } from './api/payments.js';
 import { initDb, isDbAvailable } from './services/db.js';
 import { createUserAsync, findUserByEmailAsync } from './services/userService.js';
 import { logger } from './config/logger.js';
@@ -40,6 +41,8 @@ app.use(cors({
 // Apply gzip compression
 app.use(compression());
 app.use(helmet());
+// Stripe webhook must be mounted before express.json
+app.use('/webhooks', stripeWebhookRouter);
 app.use(express.json());
 app.use(cookieParser());
 
@@ -55,6 +58,7 @@ app.use('/api/produits', productRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/payments', paymentsRoutes);
 
 // === Service des Fichiers Statiques (Frontend React) ===
 // En développement, utiliser Vite (npm run dev:client). En production, servir le build.
