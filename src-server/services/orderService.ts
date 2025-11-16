@@ -65,3 +65,17 @@ export function createOrder(userId: string, products: Product[], cart: { product
 export function getOrdersByUser(userId: string): OrderRecord[] {
   return readOrders().filter(o => o.userId === userId);
 }
+
+// Admin helpers
+export function getAllOrders(): OrderRecord[] {
+  return readOrders();
+}
+
+export function updateOrderStatus(id: string, status: OrderRecord['status']): OrderRecord | undefined {
+  const orders = readOrders();
+  const idx = orders.findIndex(o => o.id === id);
+  if (idx === -1) return undefined;
+  orders[idx].status = status;
+  writeOrders(orders);
+  return orders[idx];
+}

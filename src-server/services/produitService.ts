@@ -97,7 +97,7 @@ export function getAllProducts(): Product[] {
 
 export function addProduct(newProduct: Omit<Product, 'id' | 'rating'> & { rating?: Product['rating'] }): Product {
   const id = Math.max(0, ...products.map(p => p.id)) + 1;
-  const product: Product = { id, rating: newProduct.rating || { rate: 0, count: 0 }, ...newProduct };
+  const product: Product = { id, rating: newProduct.rating || { rate: 0, count: 0 }, stock: newProduct.stock ?? 0, ...newProduct };
   products.push(product);
   return product;
 }
