@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { CartIcon, SearchIcon, StoreIcon, UserIcon, OrdersIcon, HeartIcon } from './Icons.tsx';
+import { CartIcon, SearchIcon, StoreIcon, UserIcon, OrdersIcon, HeartIcon, CloseIcon } from './Icons.tsx';
 
 interface HeaderProps {
   onCartClick: () => void;
@@ -28,7 +28,7 @@ const Header: React.FC<HeaderProps> = ({ onCartClick, cartItemCount, searchQuery
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center space-x-4">
             <StoreIcon className="h-8 w-8 text-white" />
-            <Link to="/" className="text-2xl font-bold text-white hover:text-royal transition-colors font-serif tracking-tight">MALAFAAREH</Link>
+            <Link to="/" className="text-2xl font-bold text-white hover:text-royal transition-colors font-serif tracking-tight">Malafaareh</Link>
           </div>
 
           <div className="hidden md:flex flex-1 max-w-lg mx-8">

@@ -2,6 +2,19 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
+const isProd = process.env.NODE_ENV === 'production';
+const COOKIE_DOMAIN = process.env.COOKIE_DOMAIN || undefined; // e.g. .malafaareh.com
+
+export function cookieOptions() {
+  return {
+    httpOnly: true,
+    sameSite: 'lax' as 'lax' | 'strict' | 'none',
+    secure: !!isProd,
+    domain: COOKIE_DOMAIN,
+    // Allow frontend and backend on same apex to share cookies
+    // path defaults to '/'
+  };
+}
 
 export interface AuthUser {
   id: string;

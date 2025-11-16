@@ -17,7 +17,9 @@
     "make:admin": "tsx scripts/make-admin.ts",
     "migrate": "tsx scripts/migrate.ts",
     "test": "vitest run",
-    "prod": "pm2 start ecosystem.config.cjs --env production"
+    "prod": "pm2 start ecosystem.config.cjs --env production",
+    "drizzle:generate": "drizzle-kit generate:pg --schema=src-server/db/schema.ts --out=drizzle/migrations",
+    "drizzle:migrate": "drizzle-kit migrate:pg --schema=src-server/db/schema.ts --out=drizzle/migrations"
   },
   "keywords": [
     "react",
@@ -44,7 +46,9 @@
     "react-dom": "^19.0.0",
     "react-router-dom": "^6.28.0",
     "winston": "^3.13.0",
-    "zod": "^3.23.8"
+    "zod": "^3.23.8",
+    "@google-cloud/cloud-sql-connector": "^1.5.1",
+    "drizzle-orm": "^0.36.0"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
@@ -65,6 +69,7 @@
     "tsx": "^4.15.2",
     "typescript": "^5.4.5",
     "vite": "^5.4.8",
-    "vitest": "^4.0.9"
+    "vitest": "^4.0.9",
+    "drizzle-kit": "^0.24.0"
   }
 }

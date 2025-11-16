@@ -1,6 +1,7 @@
 import express, { Router } from 'express';
 import Stripe from 'stripe';
 import { isDbAvailable } from '../services/db.js';
+import { normalizeXafToCurrency } from '../utils/currency.js';
 import { getAllProducts, getAllProductsAsync } from '../services/produitService.js';
 import { createOrderAsync, updateOrderStatusAsync } from '../services/orderService.js';
 
@@ -26,13 +27,13 @@ paymentsRouter.post('/checkout-session', async (req, res) => {
     const order = await createOrderAsync(userId, products, items);
     const lineItems = items.map(it => {
       const product = products.find(p => p.id === it.productId)!;
+      const norm = normalizeXafToCurrency(product.price, STRIPE_CURRENCY);
       return {
         quantity: it.quantity,
         price_data: {
-          currency: STRIPE_CURRENCY,
+          currency: norm.currency,
           product_data: { name: product.name },
-          // convert XAF to chosen currency outside scope; for demo use price as cents
-          unit_amount: product.price,
+          unit_amount: norm.convertedAmountMinor,
         },
       };
     });

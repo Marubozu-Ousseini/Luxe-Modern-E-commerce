@@ -1,7 +1,8 @@
+import { apiUrl } from './apiClient';
 export interface CartItemInput { productId: number; quantity: number }
 
 export async function createOrder(items: CartItemInput[]) {
-  const res = await fetch('/api/orders', {
+  const res = await fetch(apiUrl('/api/orders'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
@@ -12,7 +13,7 @@ export async function createOrder(items: CartItemInput[]) {
 }
 
 export async function getMyOrders() {
-  const res = await fetch('/api/orders/me', { credentials: 'include' });
+  const res = await fetch(apiUrl('/api/orders/me'), { credentials: 'include' });
   if (!res.ok) throw new Error('Impossible de récupérer les commandes');
   return res.json();
 }

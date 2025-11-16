@@ -44,9 +44,19 @@ L'application est conçue pour fonctionner sur une seule instance (ex: GCE e2-mi
 
 3.  **Configuration de l'environnement**
     Créez un fichier `.env` à la racine du projet en vous basant sur le modèle `.env.example`.
-    ```
+    Points clés pour l'administration:
+    - Définir `JWT_SECRET` avec une valeur forte.
+    - Définir `ADMIN_EMAIL` et `ADMIN_PASSWORD` pour créer automatiquement le compte admin au démarrage.
+    - En production (domaine malafaareh.com), définir `COOKIE_DOMAIN=.malafaareh.com` et `ALLOWED_ORIGINS` avec vos origines front.
+    
+    Exemple minimal local:
+    ```env
     PORT=8080
     NODE_ENV=development
+    JWT_SECRET=change-me
+    ADMIN_EMAIL=admin@malafaareh.com
+    ADMIN_PASSWORD=ChangeMe_Initial_Admin_Password!
+    ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
     ```
 
 4.  **Lancer le serveur de développement**
@@ -82,6 +92,41 @@ L'application est conçue pour fonctionner sur une seule instance (ex: GCE e2-mi
     npm run prod
     ```
     Le fichier `ecosystem.config.cjs` est configuré pour lancer l'application en mode `cluster` pour une meilleure performance.
+
+## Accès Admin et Backend
+
+- URL publique du site: `https://www.malafaareh.com`
+- Backend API est servi par le même hôte (ex: `https://www.malafaareh.com/api/...`).
+- Page d'administration frontend: `https://www.malafaareh.com/admin`
+
+### Création automatique de l'admin
+
+Au démarrage du serveur, si `ADMIN_EMAIL` et `ADMIN_PASSWORD` sont définis dans l'environnement, un utilisateur admin est créé s'il n'existe pas déjà. Par défaut, l'email recommandé est `admin@malafaareh.com`.
+
+Variables à définir en production:
+
+```env
+NODE_ENV=production
+PORT=8080
+LOG_LEVEL=info
+JWT_SECRET=<secret-fort>
+ADMIN_EMAIL=admin@malafaareh.com
+ADMIN_PASSWORD=<mot_de_passe_admin_initial>
+COOKIE_DOMAIN=.malafaareh.com
+ALLOWED_ORIGINS=https://www.malafaareh.com,https://malafaareh.com
+```
+
+### Cookies et CORS
+
+- Les cookies JWT sont marqués `httpOnly` et `secure` en production. Assurez-vous d'utiliser HTTPS.
+- `COOKIE_DOMAIN` doit être `.malafaareh.com` pour que le cookie fonctionne sur `www.malafaareh.com` et `malafaareh.com`.
+- `ALLOWED_ORIGINS` doit contenir les origines autorisées à appeler l'API avec `credentials: true`.
+
+### Se connecter en admin
+
+1. Accédez à `/login` et connectez-vous avec `admin@malafaareh.com` et le mot de passe défini dans `ADMIN_PASSWORD`.
+2. Ouvrez `/admin` pour gérer les produits (CRUD via `/api/admin/produits`).
+3. Pour invalider la session, utilisez le bouton de déconnexion (ou l'endpoint `/api/auth/logout`).
 
 ## Structure des Fichiers
 

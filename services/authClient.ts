@@ -1,5 +1,6 @@
+import { apiUrl } from './apiClient';
 export async function login(email: string, password: string) {
-  const res = await fetch('/api/auth/login', {
+  const res = await fetch(apiUrl('/api/auth/login'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
@@ -10,7 +11,7 @@ export async function login(email: string, password: string) {
 }
 
 export async function register(name: string, email: string, password: string) {
-  const res = await fetch('/api/auth/register', {
+  const res = await fetch(apiUrl('/api/auth/register'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
@@ -21,5 +22,5 @@ export async function register(name: string, email: string, password: string) {
 }
 
 export async function logout() {
-  await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+  await fetch(apiUrl('/api/auth/logout'), { method: 'POST', credentials: 'include' });
 }

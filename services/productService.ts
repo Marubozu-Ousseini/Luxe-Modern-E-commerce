@@ -1,4 +1,5 @@
 import { Product } from '../types.ts';
+import { apiUrl } from './apiClient';
 
 /**
  * Récupère la liste de tous les produits depuis l'API backend.
@@ -6,7 +7,7 @@ import { Product } from '../types.ts';
  */
 export const getProducts = async (): Promise<Product[]> => {
   try {
-    const response = await fetch('/api/produits');
+  const response = await fetch(apiUrl('/api/produits'));
     if (!response.ok) {
       // Gère les erreurs HTTP comme 404 ou 500
       throw new Error(`Erreur HTTP: ${response.status}`);

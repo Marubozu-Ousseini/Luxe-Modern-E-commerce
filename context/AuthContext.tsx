@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useMemo } from 'react';
+import * as AuthAPI from '../services/authClient';
 
 type Role = 'user' | 'admin';
 
@@ -26,14 +27,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password: string) => {
     setLoading(true);
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ email, password })
-      });
-      if (!res.ok) throw new Error('Identifiants invalides');
-      const data = await res.json();
+      const data = await AuthAPI.login(email, password);
       setUser(data);
     } finally {
       setLoading(false);
@@ -43,14 +37,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const register = async (name: string, email: string, password: string) => {
     setLoading(true);
     try {
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ name, email, password })
-      });
-      if (!res.ok) throw new Error('Impossible de créer le compte');
-      const data = await res.json();
+      const data = await AuthAPI.register(name, email, password);
       setUser(data);
     } finally {
       setLoading(false);
@@ -58,7 +45,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+    await AuthAPI.logout();
     setUser(null);
   };
 

@@ -40,6 +40,10 @@ const AdminPage: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [prodLoading, setProdLoading] = useState(false);
   const [form, setForm] = useState<Omit<Product, 'id'>>({ name: '', price: 0, description: '', category: '', imageUrl: '', stock: 0 });
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(0);
+  const pageSize = 5;
+  const [editing, setEditing] = useState<Product | null>(null);
 
   // Orders state
   const [orders, setOrders] = useState<OrderRecord[]>([]);
@@ -63,7 +67,11 @@ const AdminPage: React.FC = () => {
   // Data loaders
   const fetchProducts = async () => {
     setProdLoading(true);
-    const res = await fetch(apiUrl('/api/admin/produits'), { credentials: 'include' });
+    const params = new URLSearchParams();
+    if (search) params.set('q', search);
+    params.set('limit', String(pageSize));
+    params.set('offset', String(page * pageSize));
+    const res = await fetch(apiUrl(`/api/admin/produits?${params.toString()}`), { credentials: 'include' });
     if (!res.ok) { setError('Accès refusé ou erreur serveur'); setProdLoading(false); return; }
     setProducts(await res.json());
     setProdLoading(false);
@@ -90,7 +98,7 @@ const AdminPage: React.FC = () => {
     setPayLoading(false);
   };
 
-  useEffect(() => { fetchProducts(); }, []);
+  useEffect(() => { fetchProducts(); }, [search, page]);
   useEffect(() => { if (tab === 'orders') fetchOrders(); }, [tab]);
   useEffect(() => { if (tab === 'customers') fetchUsers(); }, [tab]);
   useEffect(() => { if (tab === 'payments') fetchPayments(); }, [tab]);
@@ -112,6 +120,28 @@ const AdminPage: React.FC = () => {
   const removeProduct = async (id: number) => {
     const res = await fetch(apiUrl(`/api/admin/produits/${id}`), { method: 'DELETE', credentials: 'include' });
     if (!res.ok) { setError('Suppression échouée'); return; }
+    fetchProducts();
+  };
+  const startEdit = (p: Product) => setEditing(p);
+  const cancelEdit = () => setEditing(null);
+  const saveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editing) return;
+    const res = await fetch(apiUrl(`/api/admin/produits/${editing.id}`), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        name: editing.name,
+        price: editing.price,
+        description: editing.description,
+        category: editing.category,
+        imageUrl: editing.imageUrl,
+        stock: editing.stock ?? 0,
+      })
+    });
+    if (!res.ok) { setError('Mise à jour échouée'); return; }
+    setEditing(null);
     fetchProducts();
   };
   const changeOrderStatus = async (id: string, status: OrderStatus) => {
@@ -164,6 +194,15 @@ const AdminPage: React.FC = () => {
                 <textarea className="w-full border rounded px-3 py-2" placeholder="Description" value={form.description} onChange={e=>setForm({...form, description: e.target.value})} />
                 <button className="btn-primary px-4 py-2">Créer</button>
               </form>
+              <div className="mt-6">
+                <h3 className="font-semibold mb-2">Recherche & Pagination</h3>
+                <input className="w-full border rounded px-3 py-2 mb-2" placeholder="Rechercher..." value={search} onChange={e=>{ setPage(0); setSearch(e.target.value); }} />
+                <div className="flex items-center gap-2">
+                  <button disabled={page===0} onClick={()=>setPage(p=>Math.max(0,p-1))} className="px-3 py-1 border rounded disabled:opacity-50">Précédent</button>
+                  <span>Page {page+1}</span>
+                  <button disabled={products.length < pageSize} onClick={()=>setPage(p=>p+1)} className="px-3 py-1 border rounded disabled:opacity-50">Suivant</button>
+                </div>
+              </div>
             </div>
 
             <div className="bg-white p-6 rounded shadow">
@@ -178,12 +217,34 @@ const AdminPage: React.FC = () => {
                         <div className="font-medium">{p.name} <span className="text-xs text-gray-500">({p.category})</span></div>
                         <div className="text-sm text-gray-500">{p.price.toLocaleString()} XAF · Stock: {p.stock ?? 0}</div>
                       </div>
-                      <button onClick={() => removeProduct(p.id)} className="text-red-600">Supprimer</button>
+                      <div className="flex gap-3">
+                        <button onClick={() => startEdit(p)} className="text-blue-600">Éditer</button>
+                        <button onClick={() => removeProduct(p.id)} className="text-red-600">Supprimer</button>
+                      </div>
                     </li>
                   ))}
                 </ul>
               )}
             </div>
+            {editing && (
+              <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+                <div className="bg-white p-6 rounded w-full max-w-lg">
+                  <h2 className="font-semibold mb-4">Modifier produit #{editing.id}</h2>
+                  <form onSubmit={saveEdit} className="space-y-3">
+                    <input className="w-full border rounded px-3 py-2" value={editing.name} onChange={e=>setEditing({...editing, name: e.target.value})} />
+                    <input className="w-full border rounded px-3 py-2" type="number" value={editing.price} onChange={e=>setEditing({...editing, price: Number(e.target.value)})} />
+                    <input className="w-full border rounded px-3 py-2" type="number" value={editing.stock ?? 0} onChange={e=>setEditing({...editing, stock: Number(e.target.value)})} />
+                    <input className="w-full border rounded px-3 py-2" value={editing.category} onChange={e=>setEditing({...editing, category: e.target.value})} />
+                    <input className="w-full border rounded px-3 py-2" value={editing.imageUrl} onChange={e=>setEditing({...editing, imageUrl: e.target.value})} />
+                    <textarea className="w-full border rounded px-3 py-2" value={editing.description} onChange={e=>setEditing({...editing, description: e.target.value})} />
+                    <div className="flex gap-3 justify-end">
+                      <button type="button" onClick={cancelEdit} className="px-4 py-2 border rounded">Annuler</button>
+                      <button className="px-4 py-2 bg-black text-white rounded">Sauvegarder</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -202,14 +263,16 @@ const AdminPage: React.FC = () => {
                       <td className="text-xs">{o.userId}</td>
                       <td>{o.total.toLocaleString()} {o.currency}</td>
                       <td>
+                        <span className={`px-2 py-1 rounded text-xs font-semibold ${o.status === 'paid' ? 'bg-green-100 text-green-700' : o.status === 'failed' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>{o.status}</span>
+                      </td>
+                      <td className="text-sm">{new Date(o.createdAt).toLocaleString()}</td>
+                      <td>
                         <select className="border rounded px-2 py-1" value={o.status} onChange={e => changeOrderStatus(o.id, e.target.value as OrderStatus)}>
                           <option value="paid">payée</option>
                           <option value="pending">en attente</option>
                           <option value="failed">échouée</option>
                         </select>
                       </td>
-                      <td className="text-sm">{new Date(o.createdAt).toLocaleString()}</td>
-                      <td></td>
                     </tr>
                   ))}
                 </tbody>
@@ -260,7 +323,7 @@ const AdminPage: React.FC = () => {
                       <td className="text-xs">{p.userId}</td>
                       <td>{Number(p.amount).toLocaleString()}</td>
                       <td>{p.currency}</td>
-                      <td>{p.status}</td>
+                      <td><span className={`px-2 py-1 rounded text-xs font-semibold ${p.status === 'paid' ? 'bg-green-100 text-green-700' : p.status === 'failed' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>{p.status}</span></td>
                       <td className="text-sm">{new Date(p.createdAt).toLocaleString()}</td>
                     </tr>
                   ))}

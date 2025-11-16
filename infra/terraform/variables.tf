@@ -71,3 +71,23 @@ variable "db_user" {
   type        = string
   default     = "luxe_user"
 }
+
+variable "stripe_secret_key" {
+  description = "Stripe secret API key"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "stripe_webhook_secret" {
+  description = "Stripe webhook signing secret"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "stripe_currency" {
+  description = "Base currency to charge via Stripe (e.g. usd, eur)"
+  type        = string
+  default     = "usd"
+}
