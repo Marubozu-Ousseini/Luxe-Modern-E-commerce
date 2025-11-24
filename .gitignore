@@ -33,3 +33,4 @@ drizzle/migrations
 # Environment
 .env
 .env.*
+.terraform/
