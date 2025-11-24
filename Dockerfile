@@ -5,13 +5,14 @@ WORKDIR /app
 
 RUN apk add --no-cache libc6-compat
 COPY package*.json ./
-# Use npm ci for deterministic install
-RUN npm ci --include=dev
+# Install dependencies only; build happens in the builder stage after full context is copied
+RUN npm install
 
 FROM node:20-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# Build artifacts (client + server)
 RUN npm run build:client && npm run build:server
 
 # 2) Runtime stage

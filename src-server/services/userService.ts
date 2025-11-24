@@ -11,12 +11,22 @@ const usersFile = path.join(dataDir, 'users.json');
 
 type Role = 'user' | 'admin';
 
+export interface Voucher {
+  code: string;
+  amount?: number; // optional monetary value in minor units (e.g., XAF)
+  expiresAt?: string; // ISO date string
+  createdAt: string; // ISO date string
+}
+
 export interface UserRecord {
   id: string;
   email: string;
   name: string;
   role: Role;
   passwordHash: string;
+  rewardsPoints?: number;
+  vouchers?: Voucher[];
+  favorites?: number[]; // product IDs favored by user (FS persistence)
 }
 
 function ensureDataDir() {
@@ -27,7 +37,25 @@ function ensureDataDir() {
 function readUsers(): UserRecord[] {
   ensureDataDir();
   const raw = fs.readFileSync(usersFile, 'utf-8');
-  return JSON.parse(raw);
+  try {
+    return JSON.parse(raw);
+  } catch (e) {
+    // Attempt to sanitize common corruption: trailing characters after closing bracket
+    const start = raw.indexOf('[');
+    const end = raw.lastIndexOf(']');
+    if (start !== -1 && end !== -1 && end > start) {
+      const slice = raw.slice(start, end + 1);
+      try {
+        const parsed = JSON.parse(slice);
+        // Heal the file on disk
+        fs.writeFileSync(usersFile, JSON.stringify(parsed, null, 2));
+        return parsed;
+      } catch {/* fallthrough */}
+    }
+    // As a last resort, reset file to empty array to avoid crashing the app
+    fs.writeFileSync(usersFile, '[]');
+    return [];
+  }
 }
 
 function writeUsers(users: UserRecord[]) {
@@ -90,6 +118,51 @@ export function setUserPassword(email: string, newPassword: string): UserRecord 
   users[idx].passwordHash = bcrypt.hashSync(newPassword, 10);
   writeUsers(users);
   return users[idx];
+}
+
+// Rewards & Vouchers (FS-only for now)
+export function grantRewardsPoints(email: string, delta: number): UserRecord | undefined {
+  if (isDbAvailable()) throw new Error('Use grantRewardsPointsAsync when DB is enabled');
+  const users = readUsers();
+  const idx = users.findIndex(u => u.email.toLowerCase() === email.toLowerCase());
+  if (idx === -1) return undefined;
+  const current = users[idx].rewardsPoints || 0;
+  users[idx].rewardsPoints = Math.max(0, current + delta);
+  writeUsers(users);
+  return users[idx];
+}
+
+export function addVoucherToUser(email: string, voucher: Omit<Voucher, 'createdAt'>): UserRecord | undefined {
+  if (isDbAvailable()) throw new Error('Use addVoucherToUserAsync when DB is enabled');
+  const users = readUsers();
+  const idx = users.findIndex(u => u.email.toLowerCase() === email.toLowerCase());
+  if (idx === -1) return undefined;
+  const list = users[idx].vouchers || [];
+  const newVoucher: Voucher = { ...voucher, createdAt: new Date().toISOString() };
+  users[idx].vouchers = [newVoucher, ...list];
+  writeUsers(users);
+  return users[idx];
+}
+
+// === Favorites (FS only; DB path would require separate table) ===
+export function getUserFavoritesById(id: string): number[] {
+  if (isDbAvailable()) throw new Error('Favorites not implemented for DB mode');
+  const users = readUsers();
+  const u = users.find(u => u.id === id);
+  return u?.favorites || [];
+}
+
+export function toggleUserFavoriteById(id: string, productId: number): number[] {
+  if (isDbAvailable()) throw new Error('Favorites not implemented for DB mode');
+  const users = readUsers();
+  const idx = users.findIndex(u => u.id === id);
+  if (idx === -1) throw new Error('Utilisateur introuvable');
+  const favs = users[idx].favorites || [];
+  users[idx].favorites = favs.includes(productId)
+    ? favs.filter(f => f !== productId)
+    : [...favs, productId];
+  writeUsers(users);
+  return users[idx].favorites;
 }
 
 // Admin helpers (sanitize before returning)

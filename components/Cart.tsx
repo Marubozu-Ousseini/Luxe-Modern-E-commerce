@@ -2,6 +2,7 @@ import React from 'react';
 import { CartItem } from '../types.ts';
 import { CloseIcon, TrashIcon } from './Icons.tsx';
 import { formatCurrency } from '../src/utils/formatter.ts';
+import EmptyState from './EmptyState.tsx';
 
 interface CartProps {
   isOpen: boolean;
@@ -41,10 +42,11 @@ const Cart: React.FC<CartProps> = ({ isOpen, onClose, items, onUpdateQuantity, o
 
           {items.length === 0 ? (
             <div className="flex-grow flex flex-col items-center justify-center text-center p-6">
-              <p className="text-lg text-gray-500">Votre panier est vide.</p>
-              <button onClick={onClose} className="mt-4 btn-primary">
-                Continuer les achats
-              </button>
+              <EmptyState
+                title="Votre panier est vide."
+                actionLabel="Continuer les achats"
+                onActionClick={onClose}
+              />
             </div>
           ) : (
             <div className="flex-grow overflow-y-auto p-6">

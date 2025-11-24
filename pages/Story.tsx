@@ -1,8 +1,9 @@
 import React from 'react';
+import PageBackground from '../components/PageBackground.tsx';
 
 const Story: React.FC = () => {
   return (
-    <main className="min-h-screen bg-porcelain text-charcoal">
+    <PageBackground pageKey="story" overlayClassName="bg-black/55 backdrop-blur-[2px]">
       <section className="container mx-auto max-w-content px-4 sm:px-6 lg:px-8 py-16 md:py-20">
         <h1 className="text-4xl md:text-5xl font-serif font-semibold tracking-tight">Notre Histoire</h1>
         <p className="mt-4 max-w-2xl text-lg text-slate-700">
@@ -31,7 +32,7 @@ const Story: React.FC = () => {
           <p className="mt-3">Confort, tenue, et élégance calme. Sans compromis.</p>
         </div>
       </section>
-    </main>
+    </PageBackground>
   );
 };
 

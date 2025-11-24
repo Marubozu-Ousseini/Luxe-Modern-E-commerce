@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { CartIcon, SearchIcon, StoreIcon, UserIcon, OrdersIcon, HeartIcon, CloseIcon } from './Icons.tsx';
+import { useFavorites } from '../context/FavoritesContext.tsx';
 
 interface HeaderProps {
   onCartClick: () => void;
@@ -13,6 +14,7 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ onCartClick, cartItemCount, searchQuery, setSearchQuery, isCartAnimating }) => {
   const { user, logout } = useAuth();
+  const { favorites } = useFavorites();
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -48,10 +50,15 @@ const Header: React.FC<HeaderProps> = ({ onCartClick, cartItemCount, searchQuery
           
           <div className="flex items-center space-x-4">
             <nav className="hidden md:flex items-center space-x-3">
-              {/* Favorites icon */}
-              <button className="p-2 rounded-full text-white/90 hover:text-white hover:bg-white/10" aria-label="Favoris">
+              {/* Favorites icon with count */}
+              <Link to="/favoris" className="relative p-2 rounded-full text-white/90 hover:text-white hover:bg-white/10" aria-label="Produits favoris">
                 <HeartIcon className="h-6 w-6" />
-              </button>
+                {favorites.length > 0 && (
+                  <span className="absolute top-0 right-0 block h-5 w-5 transform -translate-y-1/2 translate-x-1/2 rounded-full text-xs font-medium bg-rose-500 text-white flex items-center justify-center">
+                    {favorites.length}
+                  </span>
+                )}
+              </Link>
               {/* Orders icon */}
               <Link to="/orders" className="p-2 rounded-full text-white/90 hover:text-white hover:bg-white/10" aria-label="Mes commandes">
                 <OrdersIcon className="h-6 w-6" />

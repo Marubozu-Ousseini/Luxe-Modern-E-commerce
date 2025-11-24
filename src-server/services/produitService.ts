@@ -84,6 +84,33 @@ const products: Product[] = [
     limitedAvailability: true,
     rating: { rate: 4.7, count: 220 }
   },
+  {
+    id: 13,
+    name: 'Parfum Ambre Nocturne',
+    price: 95000,
+    description: 'Eau de parfum chaude et enveloppante, mêlant ambre, vanille et notes boisées pour les soirées élégantes.',
+    category: 'Cosmétiques',
+    imageUrl: 'https://images.pexels.com/photos/965989/pexels-photo-965989.jpeg?auto=compress&cs=tinysrgb&w=800',
+    rating: { rate: 4.8, count: 180 },
+  },
+  {
+    id: 14,
+    name: 'Brume Parfumée Coton Doux',
+    price: 45000,
+    description: 'Body mist léger aux notes de coton frais et musc blanc, parfait pour un sillage discret au quotidien.',
+    category: 'Cosmétiques',
+    imageUrl: 'https://images.pexels.com/photos/3735613/pexels-photo-3735613.jpeg?auto=compress&cs=tinysrgb&w=800',
+    rating: { rate: 4.6, count: 95 },
+  },
+  {
+    id: 15,
+    name: 'Coffret Découverte Brumes',
+    price: 78000,
+    description: 'Set de trois brumes parfumées (fleur d’oranger, thé blanc, figue) pour varier les ambiances selon vos envies.',
+    category: 'Cosmétiques',
+    imageUrl: 'https://images.pexels.com/photos/4202922/pexels-photo-4202922.jpeg?auto=compress&cs=tinysrgb&w=800',
+    rating: { rate: 4.7, count: 120 },
+  },
 ];
 
 /**

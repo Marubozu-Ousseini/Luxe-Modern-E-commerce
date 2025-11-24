@@ -1,0 +1,46 @@
+version: '3.9'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: luxe-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: luxe_db
+    ports:
+      - '5432:5432'
+    volumes:
+      - luxe_db_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: luxe-backend
+    environment:
+      NODE_ENV: development
+      PORT: 8080
+      DATABASE_URL: postgres://postgres:postgres@db:5432/luxe_db
+    depends_on:
+      - db
+    ports:
+      - '8080:8080'
+
+  frontend:
+    image: node:20-alpine
+    working_dir: /app
+    container_name: luxe-frontend
+    volumes:
+      - .:/app
+    environment:
+      NODE_ENV: development
+      VITE_API_URL: http://localhost:8080
+    command: sh -c "npm install && npm run dev:client -- --host 0.0.0.0 --port 3000"
+    ports:
+      - '3000:3000'
+    depends_on:
+      - backend
+
+volumes:
+  luxe_db_data:

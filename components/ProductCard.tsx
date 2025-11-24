@@ -1,6 +1,8 @@
 import React from 'react';
 import { Product } from '../types.ts';
-import { CartIcon, StarIcon } from './Icons.tsx';
+import { usePromotions } from '../context/PromotionsContext.tsx';
+import { useFavorites } from '../context/FavoritesContext.tsx';
+import { CartIcon, StarIcon, HeartIcon } from './Icons.tsx';
 import { formatCurrency } from '../src/utils/formatter.ts';
 
 interface ProductCardProps {
@@ -15,6 +17,10 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onSelect, onAddToCar
     onAddToCart();
   };
 
+  const { promotions } = usePromotions();
+  const { isFavorite, toggleFavorite } = useFavorites();
+  const fav = isFavorite(product.id);
+  const stickers = promotions?.stickers || [];
   return (
     <div
       onClick={onSelect}
@@ -26,6 +32,43 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onSelect, onAddToCar
           alt={product.name}
           className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 ease-premium group-hover:scale-[1.04]"
         />
+        {/* Favorites + Stickers overlay (top-right) */}
+        <div className="absolute top-3 right-3 z-10 flex flex-col items-end gap-2">
+          <button
+            onClick={(e) => { e.stopPropagation(); toggleFavorite(product.id); }}
+            aria-label={fav ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+            className={`h-9 w-9 rounded-full flex items-center justify-center shadow-sm transition-colors backdrop-blur bg-white/85 border ${fav ? 'border-red-500 text-red-600 heart-pop' : 'border-gray-200 text-slate-600'} hover:border-red-500 hover:text-red-600`}
+          >
+            <HeartIcon className={`h-5 w-5 transition-transform ${fav ? 'fill-current' : 'fill-none stroke-current'}`} />
+          </button>
+          {stickers.length > 0 && (
+            <div className="flex flex-col items-end gap-2">
+              {stickers.map(s => (
+                s.href ? (
+                  <a key={s.id} href={s.href} onClick={e => e.stopPropagation()} className="inline-flex items-center justify-center">
+                    {s.imageUrl ? (
+                      <img src={s.imageUrl} alt={s.text || s.id} className="h-10 w-10 object-contain drop-shadow-md rounded" />
+                    ) : (
+                      <span className="inline-block text-[11px] px-2 py-1 rounded-full bg-white/85 backdrop-blur border border-gray-200 text-slate-700 shadow-sm">
+                        {s.text || s.id}
+                      </span>
+                    )}
+                  </a>
+                ) : (
+                  <span key={s.id} className="inline-flex items-center justify-center">
+                    {s.imageUrl ? (
+                      <img src={s.imageUrl} alt={s.text || s.id} className="h-10 w-10 object-contain drop-shadow-md rounded" />
+                    ) : (
+                      <span className="inline-block text-[11px] px-2 py-1 rounded-full bg-white/85 backdrop-blur border border-gray-200 text-slate-700 shadow-sm">
+                        {s.text || s.id}
+                      </span>
+                    )}
+                  </span>
+                )
+              ))}
+            </div>
+          )}
+        </div>
         {product.limitedAvailability && (
           <span className="absolute top-3 left-3 z-10 inline-block text-[11px] px-2 py-1 rounded-full bg-white/85 backdrop-blur border border-gray-200 text-slate-700">
             Disponibilité limitée

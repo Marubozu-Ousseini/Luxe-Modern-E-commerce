@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Product } from '../types.ts';
-import { BackArrowIcon, StarIcon } from './Icons.tsx';
+import { BackArrowIcon, StarIcon, HeartIcon } from './Icons.tsx';
+import { useFavorites } from '../context/FavoritesContext.tsx';
 import { formatCurrency } from '../src/utils/formatter.ts';
 
 interface ProductDetailProps {
@@ -18,6 +19,9 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product, onAddToCart, onB
     setQuantity(prev => Math.max(1, prev + amount));
   };
   
+  const { isFavorite, toggleFavorite } = useFavorites();
+  const fav = isFavorite(product.id);
+
   const handleAddToCartClick = () => {
     onAddToCart(product, quantity);
   };
@@ -46,7 +50,16 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product, onAddToCart, onB
 
         <div>
           <span className="text-sm font-medium text-accent uppercase tracking-[0.08em]">{product.category}</span>
-          <h1 className="text-3xl lg:text-4xl font-serif font-semibold text-charcoal mt-2 tracking-tight">{product.name}</h1>
+          <div className="flex items-start justify-between gap-4 mt-2">
+            <h1 className="text-3xl lg:text-4xl font-serif font-semibold text-charcoal tracking-tight flex-1">{product.name}</h1>
+            <button
+              onClick={() => toggleFavorite(product.id)}
+              aria-label={fav ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+              className={`mt-1 h-11 w-11 rounded-full flex items-center justify-center border transition-colors shadow-sm ${fav ? 'border-red-500 text-red-600 bg-red-50 heart-pop' : 'border-gray-300 text-slate-600 bg-white'} hover:border-red-500 hover:text-red-600`}
+            >
+              <HeartIcon className={`h-6 w-6 transition-transform ${fav ? 'fill-current' : 'fill-none stroke-current'}`} />
+            </button>
+          </div>
           
           <div className="flex items-center mt-4">
             <div className="flex items-center">

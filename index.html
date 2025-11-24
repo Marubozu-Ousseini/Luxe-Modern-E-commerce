@@ -71,6 +71,33 @@
         transition: transform 150ms var(--ease, cubic-bezier(0.22, 1, 0.36, 1)), opacity 150ms;
       }
       .btn-primary:hover { transform: translateY(-1px) scale(1.02); }
+      .btn-secondary {
+        background: white;
+        color: var(--color-accent);
+        padding: 0.75rem 1.25rem;
+        border-radius: 0.5rem;
+        border: 1px solid rgba(65,105,225,0.18);
+        box-shadow: var(--shadow-soft);
+        transition: transform 150ms var(--ease, cubic-bezier(0.22, 1, 0.36, 1)), background-color 150ms, color 150ms, border-color 150ms;
+      }
+      .btn-secondary:hover {
+        transform: translateY(-1px) scale(1.02);
+        background-color: rgba(239,246,255,1);
+        border-color: rgba(65,105,225,0.35);
+      }
+      .btn-outline {
+        background: transparent;
+        color: white;
+        padding: 0.75rem 1.25rem;
+        border-radius: 0.5rem;
+        border: 1px solid rgba(255,255,255,0.7);
+        transition: background-color 150ms, color 150ms, border-color 150ms, transform 150ms var(--ease, cubic-bezier(0.22, 1, 0.36, 1));
+      }
+      .btn-outline:hover {
+        transform: translateY(-1px) scale(1.02);
+        background-color: rgba(255,255,255,0.12);
+        border-color: rgba(255,255,255,0.9);
+      }
       .btn-link { color: var(--color-accent); }
       .shimmer {
         position: relative;

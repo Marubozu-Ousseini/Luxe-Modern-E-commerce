@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import './src/animations.css';
+import PromotionBanner from './components/PromotionBanner.tsx';
+import { usePromotions } from './context/PromotionsContext.tsx';
 import { Product, CartItem } from './types.ts';
 import { getProducts } from './services/productService.ts';
 import Header from './components/Header.tsx';
@@ -13,18 +16,36 @@ const App: React.FC = () => {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  // Default to "Tous" which our filter logic treats as "show all"
   const [selectedCategory, setSelectedCategory] = useState<string>('Tous');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isCartAnimating, setIsCartAnimating] = useState(false);
-  // Hero image fallback chain: local files first, then a remote default
-  const heroSources = [
-    '/hero.jpg',
-    '/hero.png',
-    '/hero.webp',
-    'https://images.unsplash.com/photo-1518551499312-89526d76c1a4?q=80&w=1600&auto=format&fit=crop'
-  ];
-  const [heroIndex, setHeroIndex] = useState(0);
+  // Dynamic home background from promotions + fallback chain
+  const { promotions } = usePromotions();
+  const [homeHeroSrc, setHomeHeroSrc] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const cfg = promotions?.pageBackgrounds?.home;
+    if (!cfg) return;
+    const isMobile = typeof window !== 'undefined' && window.matchMedia('(max-width: 640px)').matches;
+    const candidates = [isMobile ? cfg.mobile : cfg.desktop, ...(cfg.fallback || [])].filter(Boolean) as string[];
+    if (!candidates.length) return;
+    (async () => {
+      for (const c of candidates) {
+        try {
+          await new Promise<void>((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => resolve();
+            img.onerror = reject;
+            img.src = c;
+          });
+          if (!cancelled) { setHomeHeroSrc(c); break; }
+        } catch {/* next */}
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [promotions]);
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -45,7 +66,10 @@ const App: React.FC = () => {
 
   const categories = useMemo(() => {
     const allCategories = products.map(p => p.category);
-    return ['Nouveautés', ...Array.from(new Set(allCategories))];
+    const base = Array.from(new Set(allCategories));
+    // Ensure "Cosmétiques" is always visible as a curated category label
+    if (!base.includes('Cosmétiques')) base.push('Cosmétiques');
+    return ['Tous', ...base];
   }, [products]);
 
   const categoryCounts = useMemo(() => {
@@ -53,13 +77,13 @@ const App: React.FC = () => {
     for (const p of products) {
       counts[p.category] = (counts[p.category] || 0) + 1;
     }
-    counts['Nouveautés'] = products.length;
+    counts['Tous'] = products.length;
     return counts;
   }, [products]);
 
   const filteredProducts = useMemo(() => {
     return products
-      .filter(product => selectedCategory === 'Nouveautés' || product.category === selectedCategory)
+      .filter(product => selectedCategory === 'Tous' || product.category === selectedCategory)
       .filter(product =>
         product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         product.description.toLowerCase().includes(searchQuery.toLowerCase())
@@ -142,6 +166,7 @@ const App: React.FC = () => {
 
   return (
   <div className="min-h-screen bg-beige font-sans text-charcoal">
+      <PromotionBanner />
       <Header
         onCartClick={() => setIsCartOpen(true)}
         cartItemCount={totalCartItems}
@@ -168,18 +193,29 @@ const App: React.FC = () => {
             {/* Hero: full-screen width and height (minus header) */}
             <section className="relative -mx-[50vw] left-1/2 right-1/2 w-screen mb-8 overflow-hidden">
               <div className="relative h-[calc(100vh-4rem)] min-h-[calc(100vh-4rem)] w-full">
-                <img
-                  src={heroSources[heroIndex]}
-                  alt="Hero"
-                  className="absolute inset-0 w-full h-full object-cover"
-                  onError={() => setHeroIndex(i => Math.min(i + 1, heroSources.length - 1))}
-                />
+                {homeHeroSrc && (
+                  <img
+                    src={homeHeroSrc}
+                    alt="Hero"
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                )}
                 <div className="relative z-10 h-full flex flex-col items-center justify-center text-center px-6">
                   <h1 className="text-4xl md:text-5xl font-serif font-semibold tracking-tight text-white">L'Édition Saisonnière</h1>
                   {/* Subtitle removed per request */}
                   <div className="mt-8 flex gap-4">
-                    <a href="#catalogue" className="btn-primary shimmer font-medium">Explorer</a>
-                    <a href="/story" className="px-5 py-3 rounded-md border border-white/80 text-white hover:bg-white/10 transition">En savoir plus</a>
+                    <a
+                      href="#catalogue"
+                      className="btn-primary font-medium px-5 py-3"
+                      aria-label="Explorer le catalogue"
+                    >Explorer</a>
+                    <a
+                      href="/story"
+                      className="btn-secondary font-medium px-5 py-3 backdrop-blur-sm"
+                      aria-label="En savoir plus sur notre histoire"
+                    >
+                      En savoir plus
+                    </a>
                   </div>
                 </div>
               </div>
@@ -193,13 +229,13 @@ const App: React.FC = () => {
             {/* Secondary feature links below categories */}
             <section className="mt-6 mb-8">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <a href="/showroom" className="group relative overflow-hidden rounded-lg bg-white shadow-soft border border-bone/60 px-6 py-5 flex items-center justify-between">
-                  <h3 className="text-2xl md:text-3xl font-serif text-charcoal group-hover:text-royal transition-colors">Showroom</h3>
-                  <span className="text-sm text-slate group-hover:text-royal/80 transition-colors">Découvrir</span>
+                <a href="/showroom" className="group relative overflow-hidden rounded-lg bg-white shadow-soft border border-sky-200 px-6 py-5 flex items-center justify-between hover:border-sky-300">
+                  <h3 className="text-2xl md:text-3xl font-serif text-charcoal group-hover:text-blue-900 transition-colors">Showroom</h3>
+                  <span className="text-sm text-blue-900/80 group-hover:text-blue-900 transition-colors bg-sky-100 px-3 py-1 rounded-md">Découvrir</span>
                 </a>
-                <a href="/galeries" className="group relative overflow-hidden rounded-lg bg-white shadow-soft border border-bone/60 px-6 py-5 flex items-center justify-between">
-                  <h3 className="text-2xl md:text-3xl font-serif text-charcoal group-hover:text-royal transition-colors">Galeries</h3>
-                  <span className="text-sm text-slate group-hover:text-royal/80 transition-colors">Explorer</span>
+                <a href="/galeries" className="group relative overflow-hidden rounded-lg bg-white shadow-soft border border-sky-200 px-6 py-5 flex items-center justify-between hover:border-sky-300">
+                  <h3 className="text-2xl md:text-3xl font-serif text-charcoal group-hover:text-blue-900 transition-colors">Galeries</h3>
+                  <span className="text-sm text-blue-900/80 group-hover:text-blue-900 transition-colors bg-sky-100 px-3 py-1 rounded-md">Explorer</span>
                 </a>
               </div>
             </section>

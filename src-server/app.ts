@@ -14,6 +14,7 @@ import authRoutes from './api/auth.js';
 import orderRoutes from './api/orders.js';
 import adminRoutes from './api/admin.js';
 import paymentsRoutes, { stripeWebhookRouter } from './api/payments.js';
+import promotionsRoutes from './api/promotions.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -50,6 +51,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/payments', paymentsRoutes);
+app.use('/api/promotions', promotionsRoutes);
 
 const rootPath = path.resolve(__dirname, '../../');
 const distPath = path.resolve(__dirname, '../../dist');

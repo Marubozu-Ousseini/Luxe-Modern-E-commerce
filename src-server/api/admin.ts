@@ -22,7 +22,9 @@ import {
   getAllUsersSanitized,
   setUserRole,
   getAllUsersSanitizedAsync,
-  setUserRoleAsync
+  setUserRoleAsync,
+  grantRewardsPoints,
+  addVoucherToUser
 } from '../services/userService.js';
 
 const router = Router();
@@ -38,6 +40,7 @@ router.post('/produits', async (req, res) => {
   const schema = z.object({
     name: z.string().min(1),
     price: z.number().positive(),
+    originalPrice: z.number().positive().optional(),
     description: z.string().min(1),
     category: z.string().min(1),
     imageUrl: z.string().url(),
@@ -45,10 +48,10 @@ router.post('/produits', async (req, res) => {
   });
   const parse = schema.safeParse(req.body);
   if (!parse.success) return res.status(400).json({ message: 'Champs invalides', details: parse.error.flatten() });
-  const { name, price, description, category, imageUrl, stock } = parse.data;
+  const { name, price, originalPrice, description, category, imageUrl, stock } = parse.data;
   const product = isDbAvailable()
-    ? await addProductAsync({ name, price, description, category, imageUrl, stock })
-    : addProduct({ name, price, description, category, imageUrl, stock });
+    ? await addProductAsync({ name, price, originalPrice, description, category, imageUrl, stock })
+    : addProduct({ name, price, originalPrice, description, category, imageUrl, stock });
   return res.status(201).json(product);
 });
 
@@ -97,6 +100,34 @@ router.patch('/users/role', async (req, res) => {
   const changed = isDbAvailable() ? await setUserRoleAsync(parsed.data.email, parsed.data.role) : setUserRole(parsed.data.email, parsed.data.role);
   if (!changed) return res.status(404).json({ message: 'Utilisateur introuvable' });
   const { passwordHash, ...sanitized } = changed;
+  return res.json(sanitized);
+});
+
+router.post('/users/rewards', async (req, res) => {
+  const schema = z.object({ email: z.string().email(), points: z.number().int() });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: 'Paramètres invalides' });
+  if (isDbAvailable()) return res.status(501).json({ message: 'Rewards points not implemented for DB yet' });
+  const updated = grantRewardsPoints(parsed.data.email, parsed.data.points);
+  if (!updated) return res.status(404).json({ message: 'Utilisateur introuvable' });
+  const { passwordHash, ...sanitized } = updated;
+  return res.json(sanitized);
+});
+
+router.post('/users/vouchers', async (req, res) => {
+  const schema = z.object({
+    email: z.string().email(),
+    code: z.string().min(3),
+    amount: z.number().int().optional(),
+    expiresAt: z.string().datetime().optional(),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: 'Paramètres invalides' });
+  if (isDbAvailable()) return res.status(501).json({ message: 'Vouchers not implemented for DB yet' });
+  const { email, code, amount, expiresAt } = parsed.data;
+  const updated = addVoucherToUser(email, { code, amount, expiresAt });
+  if (!updated) return res.status(404).json({ message: 'Utilisateur introuvable' });
+  const { passwordHash, ...sanitized } = updated;
   return res.json(sanitized);
 });
 

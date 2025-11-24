@@ -1,0 +1,59 @@
+{
+  "promotionsActive": true,
+  "vouchersActive": true,
+  "bannerText": "Promo en cours ! Profitez de nos meilleures offres ✨",
+  "voucherText": "Utilisez vos bons et points de fidélité 🎁",
+  "updatedAt": "2025-11-24T18:22:09.431Z",
+  "loginBackground": {
+    "desktop": "blob:http://localhost:3000/8081df3e-504e-4f6f-87fc-13417cde6977",
+    "mobile": "blob:http://localhost:3000/b645734e-1b17-4c71-89b5-adee3b39e813",
+    "fallback": [
+      "blob:http://localhost:3000/8081df3e-504e-4f6f-87fc-13417cde6977"
+    ]
+  },
+  "pageBackgrounds": {
+    "home": {
+      "desktop": "blob:http://localhost:3000/5afcc99c-f066-4878-a098-287a8152394a",
+      "mobile": "blob:http://localhost:3000/926e164c-d831-4735-864a-1eb5e12f489a",
+      "fallback": [
+        "https://images.pexels.com/photos/1129413/pexels-photo-1129413.jpeg",
+        "https://images.pexels.com/photos/1581470/pexels-photo-1581470.jpeg"
+      ]
+    },
+    "showroom": {
+      "desktop": "https://images.pexels.com/photos/2896820/pexels-photo-2896820.jpeg?auto=compress&cs=tinysrgb&w=1600&q=80#showroom-desktop",
+      "mobile": "https://images.pexels.com/photos/2896820/pexels-photo-2896820.jpeg?auto=compress&cs=tinysrgb&w=800&q=80#showroom-mobile",
+      "fallback": [
+        "https://images.pexels.com/photos/1129413/pexels-photo-1129413.jpeg",
+        "https://images.pexels.com/photos/1581470/pexels-photo-1581470.jpeg"
+      ]
+    },
+    "galeries": {
+      "desktop": "https://images.pexels.com/photos/2896820/pexels-photo-2896820.jpeg?auto=compress&cs=tinysrgb&w=1600&q=80#galeries-desktop",
+      "mobile": "https://images.pexels.com/photos/2896820/pexels-photo-2896820.jpeg?auto=compress&cs=tinysrgb&w=800&q=80#galeries-mobile",
+      "fallback": [
+        "https://images.pexels.com/photos/1129413/pexels-photo-1129413.jpeg",
+        "https://images.pexels.com/photos/1581470/pexels-photo-1581470.jpeg"
+      ]
+    },
+    "story": {
+      "desktop": "https://images.pexels.com/photos/2896820/pexels-photo-2896820.jpeg?auto=compress&cs=tinysrgb&w=1600&q=80#story-desktop",
+      "mobile": "https://images.pexels.com/photos/2896820/pexels-photo-2896820.jpeg?auto=compress&cs=tinysrgb&w=800&q=80#story-mobile",
+      "fallback": [
+        "https://images.pexels.com/photos/1129413/pexels-photo-1129413.jpeg",
+        "https://images.pexels.com/photos/1581470/pexels-photo-1581470.jpeg"
+      ]
+    },
+    "admin": {
+      "desktop": "https://images.pexels.com/photos/2896820/pexels-photo-2896820.jpeg?auto=compress&cs=tinysrgb&w=1600&q=80#admin-desktop",
+      "mobile": "https://images.pexels.com/photos/2896820/pexels-photo-2896820.jpeg?auto=compress&cs=tinysrgb&w=800&q=80#admin-mobile",
+      "fallback": [
+        "https://images.pexels.com/photos/1129413/pexels-photo-1129413.jpeg",
+        "https://images.pexels.com/photos/1581470/pexels-photo-1581470.jpeg"
+      ]
+    }
+  },
+  "marqueeSpeedSeconds": 18,
+  "glowEnabled": true,
+  "stickers": []
+}
