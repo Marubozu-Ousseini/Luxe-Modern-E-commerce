@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { logger } from '../config/logger.js';
 import * as userService from '../services/userService.js';
+import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -33,7 +34,8 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/cart/merge - merges client cart into server cart for authenticated user
-router.post('/merge', async (req, res) => {
+// POST /api/cart/merge - merges client cart into server cart for authenticated user
+router.post('/merge', requireAuth, async (req, res) => {
   try {
     const user = (req as any).user;
     if (!user || !user.id) return res.status(401).json({ message: 'Not authenticated' });
