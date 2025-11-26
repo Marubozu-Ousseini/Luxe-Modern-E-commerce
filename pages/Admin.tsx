@@ -330,7 +330,29 @@ const AdminPage: React.FC = () => {
                 <input className="w-full border rounded px-3 py-2" placeholder="Ancien prix (XAF, optionnel)" type="number" value={Number(form.originalPrice ?? 0)} onChange={e=>setForm({...form, originalPrice: Number(e.target.value) || undefined})} />
                 <input className="w-full border rounded px-3 py-2" placeholder="Stock" type="number" value={form.stock ?? 0} onChange={e=>setForm({...form, stock: Number(e.target.value)})} />
                 <input className="w-full border rounded px-3 py-2" placeholder="Catégorie" value={form.category} onChange={e=>setForm({...form, category: e.target.value})} />
-                <input className="w-full border rounded px-3 py-2" placeholder="Image URL" value={form.imageUrl} onChange={e=>setForm({...form, imageUrl: e.target.value})} />
+                <div>
+                  <input className="w-full border rounded px-3 py-2" placeholder="Image URL" value={form.imageUrl} onChange={e=>setForm({...form, imageUrl: e.target.value})} />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="mt-2 w-full text-sm"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = () => {
+                        const result = reader.result as string | null;
+                        if (result) setForm({ ...form, imageUrl: result });
+                      };
+                      reader.readAsDataURL(file);
+                    }}
+                  />
+                  {form.imageUrl && (
+                    <div className="mt-2">
+                      <img src={form.imageUrl} alt="Aperçu" className="max-h-40 object-contain rounded border" />
+                    </div>
+                  )}
+                </div>
                 <textarea className="w-full border rounded px-3 py-2" placeholder="Description" value={form.description} onChange={e=>setForm({...form, description: e.target.value})} />
                 <button className="btn-primary px-4 py-2">Créer</button>
               </form>
@@ -376,7 +398,29 @@ const AdminPage: React.FC = () => {
                     <input className="w-full border rounded px-3 py-2" type="number" placeholder="Ancien prix (XAF, optionnel)" value={Number(editing.originalPrice ?? 0)} onChange={e=>setEditing({...editing!, originalPrice: Number(e.target.value) || undefined})} />
                     <input className="w-full border rounded px-3 py-2" type="number" value={editing.stock ?? 0} onChange={e=>setEditing({...editing, stock: Number(e.target.value)})} />
                     <input className="w-full border rounded px-3 py-2" value={editing.category} onChange={e=>setEditing({...editing, category: e.target.value})} />
-                    <input className="w-full border rounded px-3 py-2" value={editing.imageUrl} onChange={e=>setEditing({...editing, imageUrl: e.target.value})} />
+                    <div>
+                      <input className="w-full border rounded px-3 py-2" value={editing.imageUrl} onChange={e=>setEditing({...editing, imageUrl: e.target.value})} />
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="mt-2 w-full text-sm"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const reader = new FileReader();
+                          reader.onload = () => {
+                            const result = reader.result as string | null;
+                            if (result) setEditing({ ...editing!, imageUrl: result });
+                          };
+                          reader.readAsDataURL(file);
+                        }}
+                      />
+                      {editing.imageUrl && (
+                        <div className="mt-2">
+                          <img src={editing.imageUrl} alt="Aperçu" className="max-h-40 object-contain rounded border" />
+                        </div>
+                      )}
+                    </div>
                     <textarea className="w-full border rounded px-3 py-2" value={editing.description} onChange={e=>setEditing({...editing, description: e.target.value})} />
                     <div className="flex gap-3 justify-end">
                       <button type="button" onClick={cancelEdit} className="px-4 py-2 border rounded">Annuler</button>

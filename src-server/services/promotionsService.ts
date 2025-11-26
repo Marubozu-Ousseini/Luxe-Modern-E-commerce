@@ -1,10 +1,15 @@
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const dataDir = path.resolve(__dirname, '../../data');
+// Use an explicit writable directory inside the container when running in
+// production (Cloud Run) — /tmp is writable. Allow overriding via DATA_DIR.
+const dataDir = process.env.DATA_DIR
+  ? path.resolve(process.env.DATA_DIR)
+  : path.resolve(os.tmpdir(), 'luxe-data');
 const promosFile = path.join(dataDir, 'promotions.json');
 
 export interface PromotionsState {

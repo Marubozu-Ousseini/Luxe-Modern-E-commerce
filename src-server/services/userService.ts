@@ -1,12 +1,17 @@
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import bcrypt from 'bcryptjs';
 import { fileURLToPath } from 'url';
 import { query, isDbAvailable } from './db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const dataDir = path.resolve(__dirname, '../../data');
+// Use writable directory for runtime data. Prefer DATA_DIR env var when provided
+// (useful for Cloud Run writable path like /tmp or mounted volume). Fall back to OS temp.
+const dataDir = process.env.DATA_DIR
+  ? path.resolve(process.env.DATA_DIR)
+  : path.resolve(os.tmpdir(), 'luxe-data');
 const usersFile = path.join(dataDir, 'users.json');
 
 type Role = 'user' | 'admin';

@@ -15,6 +15,17 @@ import orderRoutes from './api/orders.js';
 import adminRoutes from './api/admin.js';
 import paymentsRoutes, { stripeWebhookRouter } from './api/payments.js';
 import promotionsRoutes from './api/promotions.js';
+import {
+  createUserIfNotExists,
+  createUserIfNotExistsAsync,
+  findUserByEmail,
+  findUserByEmailAsync,
+  setUserRole,
+  setUserRoleAsync,
+  setUserPassword,
+  setUserPasswordAsync
+} from './services/userService.js';
+import { isDbAvailable } from './services/db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -22,7 +33,8 @@ const __dirname = path.dirname(__filename);
 export const app = express();
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000,http://localhost:5173')
   .split(',')
-  .map(s => s.trim());
+  .map(s => s.trim())
+  .filter(Boolean);
 
 app.set('trust proxy', 1);
 
@@ -31,8 +43,31 @@ app.use('/webhooks', stripeWebhookRouter);
 
 app.use(cors({
   origin(origin, callback) {
+    // Allow non-browser requests (no origin)
     if (!origin) return callback(null, true);
+
+    // Allow explicit list from ALLOWED_ORIGINS
     if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+
+    // Allow common Cloud Run and App Engine hostnames so deployed frontends
+    // hosted on run.app or appspot.com are accepted without requiring
+    // explicit configuration. Also allow a single FRONTEND_ORIGIN env var
+    // if provided (for custom domains).
+    const frontendDomain = (process.env.FRONTEND_ORIGIN || '').trim();
+    if (frontendDomain && origin === frontendDomain) return callback(null, true);
+
+    if (origin.endsWith('.run.app') || origin.endsWith('.appspot.com')) {
+      return callback(null, true);
+    }
+
+    // Allow our custom domain (and any subdomains) to access the API once
+    // it has been mapped to Cloud Run. This covers requests from
+    // https://malafaareh.com and https://www.malafaareh.com without requiring
+    // an explicit env var.
+    if (origin === 'https://malafaareh.com' || origin.endsWith('.malafaareh.com')) {
+      return callback(null, true);
+    }
+
     return callback(new Error(`Origin ${origin} not allowed by CORS`));
   },
   credentials: true
@@ -78,5 +113,40 @@ if (process.env.NODE_ENV === 'production') {
   app.use(express.static(distPath));
   app.get('*', (_req, res) => res.sendFile(path.join(distPath, 'index.html')));
 }
+
+// Seed an admin user from environment variables if provided. This helps when
+// deploying to environments where you want a one-time default admin account.
+// Use ADMIN_EMAIL and ADMIN_PASSWORD to create the account. Set ADMIN_FORCE=true
+// to force a password update on each start (useful for controlled environments).
+;(async function seedAdmin() {
+  const adminEmail = (process.env.ADMIN_EMAIL || '').trim();
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  const force = ('' + (process.env.ADMIN_FORCE || '')).toLowerCase() === 'true';
+  if (!adminEmail || !adminPassword) return;
+  try {
+    const existing = isDbAvailable() ? await findUserByEmailAsync(adminEmail) : findUserByEmail(adminEmail);
+    if (!existing) {
+      if (isDbAvailable()) {
+        await createUserIfNotExistsAsync('Administrator', adminEmail, adminPassword, 'admin');
+      } else {
+        createUserIfNotExists('Administrator', adminEmail, adminPassword, 'admin');
+      }
+      logger.info(`Admin user created: ${adminEmail}`);
+      return;
+    }
+    // Ensure the role is admin
+    if (existing.role !== 'admin') {
+      if (isDbAvailable()) await setUserRoleAsync(adminEmail, 'admin'); else setUserRole(adminEmail, 'admin');
+      logger.info(`Promoted ${adminEmail} to admin`);
+    }
+    // Optionally force-set password
+    if (force) {
+      if (isDbAvailable()) await setUserPasswordAsync(adminEmail, adminPassword); else setUserPassword(adminEmail, adminPassword);
+      logger.info(`Admin password for ${adminEmail} reset due to ADMIN_FORCE=true`);
+    }
+  } catch (e: any) {
+    logger.warn('Unable to seed admin user from env:', e?.message || e);
+  }
+})();
 
 export default app;
