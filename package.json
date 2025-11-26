@@ -47,7 +47,8 @@
     "react-dom": "^19.0.0",
     "react-router-dom": "^6.28.0",
     "winston": "^3.13.0",
-    "zod": "^3.23.8"
+    "zod": "^3.23.8",
+    "stripe": "^19.3.1"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.4.2",
@@ -69,7 +70,6 @@
     "concurrently": "^8.2.2",
     "drizzle-kit": "^0.24.0",
     "jsdom": "^27.2.0",
-    "stripe": "^19.3.1",
     "supertest": "^7.1.4",
     "tsx": "^4.15.2",
     "typescript": "^5.4.5",
