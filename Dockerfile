@@ -34,4 +34,4 @@ USER 1001
 # Expose port and run server
 ENV PORT=8080
 EXPOSE 8080
-CMD ["node", "dist/server.js"]
+CMD ["node", "dist/src-server/server.js"]

@@ -110,6 +110,9 @@ const AdminPage: React.FC = () => {
   const [promoLoading, setPromoLoading] = useState(false);
   const [previewState, setPreviewState] = useState<any | null>(null);
   const [previewPageKey, setPreviewPageKey] = useState<string>('home');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
 
   const tabs: { key: TabKey; label: string }[] = useMemo(() => ([
     { key: 'products', label: 'Produits' },
@@ -457,6 +460,67 @@ const AdminPage: React.FC = () => {
             )}
           </div>
         )}
+
+        {/* Admin password change */}
+        <div className="mt-8 bg-white/95 text-charcoal p-6 rounded shadow max-w-md">
+          <h2 className="font-semibold mb-4">Changer votre mot de passe</h2>
+          {passwordMessage && (
+            <div className="mb-3 text-sm {passwordMessage.startsWith('Succès') ? 'text-green-600' : 'text-red-600'}">
+              {passwordMessage}
+            </div>
+          )}
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setPasswordMessage(null);
+              if (!currentPassword || !newPassword) {
+                setPasswordMessage('Veuillez remplir tous les champs');
+                return;
+              }
+              try {
+                const res = await fetch(apiUrl('/api/admin/users/password'), {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  credentials: 'include',
+                  body: JSON.stringify({ currentPassword, newPassword }),
+                });
+                if (!res.ok) {
+                  const data = await res.json().catch(() => null);
+                  setPasswordMessage(data?.message || 'Erreur lors du changement de mot de passe');
+                  return;
+                }
+                setPasswordMessage('Succès: mot de passe mis à jour');
+                setCurrentPassword('');
+                setNewPassword('');
+              } catch {
+                setPasswordMessage('Erreur réseau, veuillez réessayer');
+              }
+            }}
+            className="space-y-3"
+          >
+            <div>
+              <label className="block text-sm mb-1" htmlFor="currentPassword">Mot de passe actuel</label>
+              <input
+                id="currentPassword"
+                type="password"
+                className="w-full border rounded px-3 py-2"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-sm mb-1" htmlFor="newPassword">Nouveau mot de passe</label>
+              <input
+                id="newPassword"
+                type="password"
+                className="w-full border rounded px-3 py-2"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+              />
+            </div>
+            <button className="px-4 py-2 bg-black text-white rounded">Mettre à jour</button>
+          </form>
+        </div>
 
         {tab === 'payments' && (
           <div className="bg-white/95 text-charcoal p-6 rounded shadow">

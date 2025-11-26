@@ -24,7 +24,12 @@ import {
   getAllUsersSanitizedAsync,
   setUserRoleAsync,
   grantRewardsPoints,
-  addVoucherToUser
+  addVoucherToUser,
+  setUserPassword,
+  setUserPasswordAsync,
+  verifyPassword,
+  findUserByEmail,
+  findUserByEmailAsync
 } from '../services/userService.js';
 
 const router = Router();
@@ -129,6 +134,34 @@ router.post('/users/vouchers', async (req, res) => {
   if (!updated) return res.status(404).json({ message: 'Utilisateur introuvable' });
   const { passwordHash, ...sanitized } = updated;
   return res.json(sanitized);
+});
+
+router.post('/users/password', async (req, res) => {
+  const schema = z.object({
+    currentPassword: z.string().min(1),
+    newPassword: z.string().min(6),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: 'Paramètres invalides' });
+
+  const email = req.user?.email;
+  if (!email) return res.status(401).json({ message: 'Non authentifié' });
+
+  const { currentPassword, newPassword } = parsed.data;
+
+  const user = isDbAvailable() ? await findUserByEmailAsync(email) : findUserByEmail(email);
+  if (!user) return res.status(404).json({ message: 'Utilisateur introuvable' });
+
+  const ok = verifyPassword(currentPassword, user.passwordHash);
+  if (!ok) return res.status(400).json({ message: 'Mot de passe actuel incorrect' });
+
+  const updated = isDbAvailable()
+    ? await setUserPasswordAsync(email, newPassword)
+    : setUserPassword(email, newPassword);
+
+  if (!updated) return res.status(500).json({ message: 'Impossible de mettre à jour le mot de passe' });
+
+  return res.json({ success: true });
 });
 
 // === Payments (derived) ===
