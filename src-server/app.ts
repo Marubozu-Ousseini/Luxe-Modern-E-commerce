@@ -15,17 +15,7 @@ import orderRoutes from './api/orders.js';
 import adminRoutes from './api/admin.js';
 import paymentsRoutes, { stripeWebhookRouter } from './api/payments.js';
 import promotionsRoutes from './api/promotions.js';
-import {
-  createUserIfNotExists,
-  createUserIfNotExistsAsync,
-  findUserByEmail,
-  findUserByEmailAsync,
-  setUserRole,
-  setUserRoleAsync,
-  setUserPassword,
-  setUserPasswordAsync
-} from './services/userService.js';
-import { isDbAvailable } from './services/db.js';
+import cartRoutes from './api/cart.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -104,6 +94,7 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/payments', paymentsRoutes);
 app.use('/api/promotions', promotionsRoutes);
+app.use('/api/cart', cartRoutes);
 
 // Use the project working directory to locate the built `dist` folder so static
 // file serving works correctly whether running source or compiled code.
@@ -113,40 +104,5 @@ if (process.env.NODE_ENV === 'production') {
   app.use(express.static(distPath));
   app.get('*', (_req, res) => res.sendFile(path.join(distPath, 'index.html')));
 }
-
-// Seed an admin user from environment variables if provided. This helps when
-// deploying to environments where you want a one-time default admin account.
-// Use ADMIN_EMAIL and ADMIN_PASSWORD to create the account. Set ADMIN_FORCE=true
-// to force a password update on each start (useful for controlled environments).
-;(async function seedAdmin() {
-  const adminEmail = (process.env.ADMIN_EMAIL || '').trim();
-  const adminPassword = process.env.ADMIN_PASSWORD;
-  const force = ('' + (process.env.ADMIN_FORCE || '')).toLowerCase() === 'true';
-  if (!adminEmail || !adminPassword) return;
-  try {
-    const existing = isDbAvailable() ? await findUserByEmailAsync(adminEmail) : findUserByEmail(adminEmail);
-    if (!existing) {
-      if (isDbAvailable()) {
-        await createUserIfNotExistsAsync('Administrator', adminEmail, adminPassword, 'admin');
-      } else {
-        createUserIfNotExists('Administrator', adminEmail, adminPassword, 'admin');
-      }
-      logger.info(`Admin user created: ${adminEmail}`);
-      return;
-    }
-    // Ensure the role is admin
-    if (existing.role !== 'admin') {
-      if (isDbAvailable()) await setUserRoleAsync(adminEmail, 'admin'); else setUserRole(adminEmail, 'admin');
-      logger.info(`Promoted ${adminEmail} to admin`);
-    }
-    // Optionally force-set password
-    if (force) {
-      if (isDbAvailable()) await setUserPasswordAsync(adminEmail, adminPassword); else setUserPassword(adminEmail, adminPassword);
-      logger.info(`Admin password for ${adminEmail} reset due to ADMIN_FORCE=true`);
-    }
-  } catch (e: any) {
-    logger.warn('Unable to seed admin user from env:', e?.message || e);
-  }
-})();
 
 export default app;

@@ -32,6 +32,7 @@ export interface UserRecord {
   rewardsPoints?: number;
   vouchers?: Voucher[];
   favorites?: number[]; // product IDs favored by user (FS persistence)
+  cart?: any[]; // persisted cart items (FS and DB)
 }
 
 function ensureDataDir() {
@@ -221,4 +222,47 @@ export async function getAllUsersSanitizedAsync(): Promise<Omit<UserRecord, 'pas
   if (!isDbAvailable()) return getAllUsersSanitized();
   const { rows } = await query<UserRecord>('SELECT id, email, name, role, password_hash as "passwordHash" FROM users ORDER BY created_at DESC');
   return rows.map(({ passwordHash, ...rest }) => rest);
+}
+
+// === Cart helpers ===
+export function getCartByUserIdSync(id: string): any[] {
+  if (isDbAvailable()) throw new Error('Use getCartByUserId when DB is enabled');
+  const users = readUsers();
+  const u = users.find(u => u.id === id);
+  return u?.cart || [];
+}
+
+export function setCartByUserIdSync(id: string, cart: any[]): void {
+  if (isDbAvailable()) throw new Error('Use setCartByUserId when DB is enabled');
+  const users = readUsers();
+  const idx = users.findIndex(u => u.id === id);
+  if (idx === -1) throw new Error('Utilisateur introuvable');
+  users[idx].cart = cart || [];
+  writeUsers(users);
+}
+
+export async function getCartByUserId(id: string): Promise<any[]> {
+  if (!isDbAvailable()) return getCartByUserIdSync(id);
+  const { rows } = await query<{ cart: any[] }>('SELECT cart FROM users WHERE id=$1 LIMIT 1', [id]);
+  return rows[0]?.cart || [];
+}
+
+export async function setCartByUserId(id: string, cart: any[]): Promise<void> {
+  if (!isDbAvailable()) return setCartByUserIdSync(id, cart);
+  await query('UPDATE users SET cart=$1 WHERE id=$2', [cart || [], id]);
+}
+
+export async function mergeCartByUserId(id: string, clientCart: any[]): Promise<any[]> {
+  const serverCart = await getCartByUserId(id) || [];
+  const map = new Map<string, any>();
+  for (const item of serverCart) map.set(String(item.productId), { ...item });
+  for (const item of clientCart) {
+    const key = String(item.productId);
+    const existing = map.get(key);
+    if (existing) existing.qty = (existing.qty || 0) + (item.qty || 0);
+    else map.set(key, { ...item });
+  }
+  const merged = Array.from(map.values());
+  await setCartByUserId(id, merged);
+  return merged;
 }
