@@ -249,7 +249,9 @@ export async function getCartByUserId(id: string): Promise<any[]> {
 
 export async function setCartByUserId(id: string, cart: any[]): Promise<void> {
   if (!isDbAvailable()) return setCartByUserIdSync(id, cart);
-  await query('UPDATE users SET cart=$1 WHERE id=$2', [cart || [], id]);
+  // Ensure we pass a JSON value for the JSONB column. Passing a raw JS array can be
+  // interpreted as a Postgres array by the driver; stringify to guarantee valid JSON input.
+  await query('UPDATE users SET cart=$1 WHERE id=$2', [JSON.stringify(cart || []), id]);
 }
 
 export async function mergeCartByUserId(id: string, clientCart: any[]): Promise<any[]> {
