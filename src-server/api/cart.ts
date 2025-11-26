@@ -4,7 +4,7 @@ import * as userService from '../services/userService.js';
 
 const router = Router();
 
-function mergeCarts(serverCart = [], clientCart = []) {
+function mergeCarts(serverCart: any[] = [], clientCart: any[] = []): any[] {
   const map = new Map();
   for (const item of serverCart) map.set(String(item.productId), { ...item });
   for (const item of clientCart) {
