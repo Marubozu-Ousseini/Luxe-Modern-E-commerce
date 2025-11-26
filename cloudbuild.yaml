@@ -34,6 +34,19 @@ steps:
           echo "Skipping tests (set _RUN_TESTS=true to enable)"
         fi
 
+  # Run smoke tests specifically (keeps them separate so CI can surface quick failures)
+  - name: 'gcr.io/cloud-builders/npm'
+    id: 'Run smoke tests'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        if [ "$_RUN_TESTS" = "true" ]; then
+          npm run test -- tests/smoke_cart.spec.ts
+        else
+          echo "Skipping smoke tests (set _RUN_TESTS=true to enable)"
+        fi
+
   - name: 'gcr.io/cloud-builders/docker'
     id: 'Build image'
     args:
