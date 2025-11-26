@@ -15,6 +15,7 @@ substitutions:
   _PROJECT_ID: "aerobic-botany-479212-s7"
   _IMAGE_TAG: "latest"
   _RUN_TESTS: "true"
+  _RUN_MIGRATIONS: "false"
 
 steps:
   - name: 'gcr.io/cloud-builders/npm'
@@ -48,13 +49,21 @@ steps:
       - '$_REGION-docker.pkg.dev/$_PROJECT_ID/$_REPO/$_SERVICE_NAME:$_IMAGE_TAG'
 
   # Optional: run migrations inside a temporary container (requires DATABASE_URL secret)
-  - name: '$_REGION-docker.pkg.dev/$_PROJECT_ID/$_REPO/$_SERVICE_NAME:$_IMAGE_TAG'
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'Run migrations'
-    entrypoint: 'sh'
-    secretEnv: [ 'DATABASE_URL' ]
+    entrypoint: 'bash'
     args:
       - '-c'
-      - 'node dist/migrate.js || echo "Migration script not found (ensure build includes migrations)"'
+      - |
+        if [ "$_RUN_MIGRATIONS" = "true" ]; then
+          echo "Running migrations..."
+          # Retrieve DATABASE_URL from Secret Manager at runtime. This requires Secret Manager API
+          # enabled and the Cloud Build service account to have secret accessor role.
+          export DATABASE_URL="$(gcloud secrets versions access latest --secret=DATABASE_URL --project=$_PROJECT_ID)"
+          node dist/migrate.js || echo "Migration script not found or failed"
+        else
+          echo "Skipping migrations (set _RUN_MIGRATIONS=true to enable)"
+        fi
 
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'Deploy Cloud Run'
