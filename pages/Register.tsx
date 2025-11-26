@@ -6,6 +6,8 @@ const RegisterPage: React.FC = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [phone, setPhone] = useState('');
+  const [town, setTown] = useState('');
   const [error, setError] = useState<string | null>(null);
   const { register } = useAuth();
   const navigate = useNavigate();
@@ -13,8 +15,8 @@ const RegisterPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    try {
-      await register(name, email, password);
+      try {
+      await register(name, email, password, phone, town);
       navigate('/');
     } catch (err: any) {
       setError(err?.message || "Erreur d'inscription");
@@ -29,6 +31,8 @@ const RegisterPage: React.FC = () => {
         <form onSubmit={handleSubmit} className="space-y-4">
           <input value={name} onChange={e => setName(e.target.value)} placeholder="Nom" className="w-full px-3 py-2 border rounded" />
           <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" className="w-full px-3 py-2 border rounded" />
+          <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="Téléphone" className="w-full px-3 py-2 border rounded" />
+          <input value={town} onChange={e => setTown(e.target.value)} placeholder="Ville" className="w-full px-3 py-2 border rounded" />
           <input value={password} onChange={e => setPassword(e.target.value)} placeholder="Mot de passe" type="password" className="w-full px-3 py-2 border rounded" />
           <button className="w-full btn-primary py-2.5">Créer un compte</button>
         </form>

@@ -82,7 +82,7 @@ export function findUserById(id: string): UserRecord | undefined {
   return readUsers().find(u => u.id === id);
 }
 
-export function createUser(name: string, email: string, password: string, role: Role = 'user'): UserRecord {
+export function createUser(name: string, email: string, password: string, role: Role = 'user', phone?: string, town?: string): UserRecord {
   if (isDbAvailable()) throw new Error('Use createUserAsync when DB is enabled');
   const users = readUsers();
   if (users.some(u => u.email.toLowerCase() === email.toLowerCase())) {
@@ -90,7 +90,7 @@ export function createUser(name: string, email: string, password: string, role: 
   }
   const id = String(Date.now());
   const passwordHash = bcrypt.hashSync(password, 10);
-  const user: UserRecord = { id, email, name, role, passwordHash };
+  const user: UserRecord = { id, email, name, role, passwordHash, phone, town } as any;
   users.push(user);
   writeUsers(users);
   return user;
@@ -179,24 +179,24 @@ export function getAllUsersSanitized(): Omit<UserRecord, 'passwordHash'>[] {
 // === Async DB-backed variants ===
 export async function findUserByEmailAsync(email: string): Promise<UserRecord | undefined> {
   if (!isDbAvailable()) return findUserByEmail(email);
-  const { rows } = await query<UserRecord>('SELECT id, email, name, role, password_hash as "passwordHash" FROM users WHERE lower(email)=lower($1) LIMIT 1', [email]);
+  const { rows } = await query<UserRecord>('SELECT id, email, name, role, password_hash as "passwordHash", phone, town, cart FROM users WHERE lower(email)=lower($1) LIMIT 1', [email]);
   return rows[0];
 }
 
 export async function findUserByIdAsync(id: string): Promise<UserRecord | undefined> {
   if (!isDbAvailable()) return findUserById(id);
-  const { rows } = await query<UserRecord>('SELECT id, email, name, role, password_hash as "passwordHash" FROM users WHERE id=$1 LIMIT 1', [id]);
+  const { rows } = await query<UserRecord>('SELECT id, email, name, role, password_hash as "passwordHash", phone, town, cart FROM users WHERE id=$1 LIMIT 1', [id]);
   return rows[0];
 }
 
-export async function createUserAsync(name: string, email: string, password: string, role: Role = 'user'): Promise<UserRecord> {
-  if (!isDbAvailable()) return createUser(name, email, password, role);
+export async function createUserAsync(name: string, email: string, password: string, role: Role = 'user', phone?: string, town?: string): Promise<UserRecord> {
+  if (!isDbAvailable()) return createUser(name, email, password, role, phone, town);
   const existing = await findUserByEmailAsync(email);
   if (existing) throw new Error('Email déjà utilisé');
   const id = String(Date.now());
   const passwordHash = bcrypt.hashSync(password, 10);
-  await query('INSERT INTO users (id, email, name, role, password_hash) VALUES ($1,$2,$3,$4,$5)', [id, email, name, role, passwordHash]);
-  return { id, email, name, role, passwordHash };
+  await query('INSERT INTO users (id, email, name, role, password_hash, phone, town) VALUES ($1,$2,$3,$4,$5,$6,$7)', [id, email, name, role, passwordHash, phone || null, town || null]);
+  return { id, email, name, role, passwordHash, phone, town } as any;
 }
 
 export async function createUserIfNotExistsAsync(name: string, email: string, password: string, role: Role = 'user'): Promise<UserRecord> {
@@ -220,7 +220,7 @@ export async function setUserPasswordAsync(email: string, newPassword: string): 
 
 export async function getAllUsersSanitizedAsync(): Promise<Omit<UserRecord, 'passwordHash'>[]> {
   if (!isDbAvailable()) return getAllUsersSanitized();
-  const { rows } = await query<UserRecord>('SELECT id, email, name, role, password_hash as "passwordHash" FROM users ORDER BY created_at DESC');
+  const { rows } = await query<UserRecord>('SELECT id, email, name, role, password_hash as "passwordHash", phone, town FROM users ORDER BY created_at DESC');
   return rows.map(({ passwordHash, ...rest }) => rest);
 }
 
