@@ -38,7 +38,24 @@ app.use(cors({
   credentials: true
 }));
 app.use(compression());
-app.use(helmet());
+// Configure Helmet with a CSP that allows the Tailwind CDN and the inline Tailwind config
+// The inline Tailwind config is used in index.html (tailwind.config) and needs 'unsafe-inline'
+// This is a pragmatic, short-term fix to unblock the deployed site. For production hardening
+// we should precompile Tailwind and remove inline scripts or use nonces.
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", 'https://cdn.tailwindcss.com'],
+      styleSrc: ["'self'", 'https://fonts.googleapis.com', "'unsafe-inline'"],
+      fontSrc: ["'self'", 'https:', 'data:'],
+      imgSrc: ["'self'", 'data:', 'https:'],
+      connectSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      upgradeInsecureRequests: [],
+    }
+  }
+}));
 app.use(express.json());
 app.use(cookieParser());
 
