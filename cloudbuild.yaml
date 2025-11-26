@@ -8,6 +8,14 @@
 # _IMAGE_TAG=latest (or CI commit SHA)
 # Optionally: _RUN_REGION=us-central1
 
+substitutions:
+  _REGION: "europe-west1"
+  _SERVICE_NAME: "luxe-modern-e-commerce"
+  _REPO: "luxe-repo"
+  _PROJECT_ID: "aerobic-botany-479212-s7"
+  _IMAGE_TAG: "latest"
+  _RUN_TESTS: "true"
+
 steps:
   - name: 'gcr.io/cloud-builders/npm'
     id: 'Install deps'
