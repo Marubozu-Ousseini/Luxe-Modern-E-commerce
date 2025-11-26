@@ -35,3 +35,4 @@ drizzle/migrations
 .env.*
 .terraform/
 .terraform/
+cookie.txt
