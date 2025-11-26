@@ -15,7 +15,15 @@ steps:
 
   - name: 'gcr.io/cloud-builders/npm'
     id: 'Run tests'
-    args: ['run', 'test']
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        if [ "${_RUN_TESTS:-true}" = "true" ]; then
+          npm run test
+        else
+          echo "Skipping tests (set _RUN_TESTS=true to enable)"
+        fi
 
   - name: 'gcr.io/cloud-builders/docker'
     id: 'Build image'
