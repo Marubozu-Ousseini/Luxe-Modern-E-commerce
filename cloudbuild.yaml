@@ -27,7 +27,7 @@ steps:
     args:
       - '-c'
       - |
-        if [ "${_RUN_TESTS:-true}" = "true" ]; then
+        if [ "$_RUN_TESTS" = "true" ]; then
           npm run test
         else
           echo "Skipping tests (set _RUN_TESTS=true to enable)"
