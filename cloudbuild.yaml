@@ -76,7 +76,7 @@ steps:
           --region ${_RUN_REGION:-$_REGION} \
           --platform managed \
           --allow-unauthenticated \
-          --set-env-vars=NODE_ENV=production,PORT=8080
+          --set-env-vars=NODE_ENV=production
 
 images:
   - '$_REGION-docker.pkg.dev/$_PROJECT_ID/$_REPO/$_SERVICE_NAME:$_IMAGE_TAG'
