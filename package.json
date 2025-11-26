@@ -13,6 +13,7 @@
     "build:server": "tsc -p tsconfig.server.json",
   "build:client": "vite build",
   "preview": "vite preview --port 3000",
+  "reset-admin": "tsx scripts/reset-admin.ts",
     "make:admin": "tsx scripts/make-admin.ts",
     "migrate": "tsx scripts/migrate.ts",
     "test": "vitest run",
