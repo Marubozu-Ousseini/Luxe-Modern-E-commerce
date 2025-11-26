@@ -70,8 +70,10 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/payments', paymentsRoutes);
 app.use('/api/promotions', promotionsRoutes);
 
-const rootPath = path.resolve(__dirname, '../../');
-const distPath = path.resolve(__dirname, '../../dist');
+// Use the project working directory to locate the built `dist` folder so static
+// file serving works correctly whether running source or compiled code.
+const rootPath = path.resolve(process.cwd());
+const distPath = path.resolve(process.cwd(), 'dist');
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(distPath));
   app.get('*', (_req, res) => res.sendFile(path.join(distPath, 'index.html')));
