@@ -42,6 +42,12 @@ router.post('/merge', requireAuth, async (req, res) => {
     const clientCart = Array.isArray(req.body.cart) ? req.body.cart : [];
     const serverCart = await userService.getCartByUserId(user.id) || [];
     const merged = mergeCarts(serverCart, clientCart);
+    try {
+      // Log merged payload to help debug JSON/DB serialization issues in CI/local runs
+      logger.info(`Merged cart for user ${user.id}: ${JSON.stringify(merged)}`);
+    } catch (e) {
+      // swallow logging errors
+    }
     await userService.setCartByUserId(user.id, merged);
     return res.json(merged);
   } catch (e) {
