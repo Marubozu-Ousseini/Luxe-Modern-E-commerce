@@ -15,8 +15,10 @@ import {
 import {
   getAllOrders,
   updateOrderStatus,
+  confirmOrderShipment,
   getAllOrdersAsync,
   updateOrderStatusAsync
+  , confirmOrderShipmentAsync
 } from '../services/orderService.js';
 import {
   getAllUsersSanitized,
@@ -88,6 +90,14 @@ router.patch('/orders/:id', async (req, res) => {
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ message: 'Statut invalide' });
   const updated = isDbAvailable() ? await updateOrderStatusAsync(id, parsed.data.status) : updateOrderStatus(id, parsed.data.status);
+  if (!updated) return res.status(404).json({ message: 'Commande introuvable' });
+  return res.json(updated);
+});
+
+// Admin confirms shipment (mark order as adminConfirmed=true)
+router.patch('/orders/:id/confirm-shipment', async (req, res) => {
+  const id = String(req.params.id);
+  const updated = isDbAvailable() ? await confirmOrderShipmentAsync(id) : confirmOrderShipment(id);
   if (!updated) return res.status(404).json({ message: 'Commande introuvable' });
   return res.json(updated);
 });

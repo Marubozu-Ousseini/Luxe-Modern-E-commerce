@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { CartItem } from '../types.ts';
 import { CloseIcon, TrashIcon } from './Icons.tsx';
 import { formatCurrency } from '../src/utils/formatter.ts';
 import EmptyState from './EmptyState.tsx';
+import { createOrder } from '../services/orderClient';
 
 interface CartProps {
   isOpen: boolean;
@@ -13,6 +14,7 @@ interface CartProps {
 }
 
 const Cart: React.FC<CartProps> = ({ isOpen, onClose, items, onUpdateQuantity, onRemove }) => {
+  const [paymentMethod, setPaymentMethod] = useState<'orange_money' | 'mtn_mobile_money' | 'on_delivery'>('on_delivery');
   const subtotal = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
 
   return (
@@ -90,9 +92,29 @@ const Cart: React.FC<CartProps> = ({ isOpen, onClose, items, onUpdateQuantity, o
               </div>
               <p className="mt-2 text-sm text-slate-600">Frais de port et taxes calculés à la caisse. Paiement sécurisé. Retours offerts sous 14 jours.</p>
               <div className="mt-6">
-                <a href="#" className="flex items-center justify-center rounded-md border border-transparent btn-primary px-6 py-3 text-base font-medium">
-                  Passer au paiement
-                </a>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm mb-1">Mode de paiement</label>
+                    <select value={paymentMethod} onChange={e=>setPaymentMethod(e.target.value as any)} className="w-full border rounded px-3 py-2">
+                      <option value="orange_money">Orange Money</option>
+                      <option value="mtn_mobile_money">MTN Mobile Money</option>
+                      <option value="on_delivery">Paiement à la livraison</option>
+                    </select>
+                  </div>
+                  <button onClick={async (ev) => {
+                    ev.preventDefault();
+                    try {
+                      const payload = items.map(i => ({ productId: i.product.id, quantity: i.quantity }));
+                      const order = await createOrder(payload, paymentMethod);
+                      // navigate to orders page
+                      window.location.href = '/orders';
+                    } catch (err: any) {
+                      alert(err?.message || 'Erreur lors de la commande');
+                    }
+                  }} className="w-full flex items-center justify-center rounded-md border border-transparent btn-primary px-6 py-3 text-base font-medium">
+                    Passer au paiement
+                  </button>
+                </div>
               </div>
             </div>
           )}

@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { formatCurrency } from '../src/utils/formatter';
 
 interface OrderItem { productId: number; quantity: number; price: number }
-interface Order { id: string; total: number; currency: 'XAF'; status: string; createdAt: string; items: OrderItem[] }
+interface Order { id: string; total: number; currency: 'XAF'; status: string; createdAt: string; items: OrderItem[]; paymentMethod?: string; adminConfirmed?: boolean }
 
 const OrdersPage: React.FC = () => {
   const { user } = useAuth();
@@ -37,10 +37,11 @@ const OrdersPage: React.FC = () => {
                 <div>
                   <div className="font-semibold">Commande #{o.id}</div>
                   <div className="text-sm text-gray-500">{new Date(o.createdAt).toLocaleString()}</div>
+                  <div className="text-sm text-gray-500">Paiement: {o.paymentMethod === 'orange_money' ? 'Orange Money' : o.paymentMethod === 'mtn_mobile_money' ? 'MTN Mobile Money' : 'Paiement à la livraison'}</div>
                 </div>
                 <div className="text-right">
                   <div className="font-semibold">{formatCurrency(o.total)}</div>
-                  <div className="text-sm text-gray-500">Statut: {o.status}</div>
+                  <div className="text-sm text-gray-500">Statut: {o.status} {o.adminConfirmed ? '· Confirmé pour envoi' : ''}</div>
                 </div>
               </div>
             </li>

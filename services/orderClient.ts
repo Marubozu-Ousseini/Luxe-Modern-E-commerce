@@ -1,12 +1,12 @@
 import { apiUrl } from './apiClient';
 export interface CartItemInput { productId: number; quantity: number }
 
-export async function createOrder(items: CartItemInput[]) {
+export async function createOrder(items: CartItemInput[], paymentMethod?: 'orange_money' | 'mtn_mobile_money' | 'on_delivery') {
   const res = await fetch(apiUrl('/api/orders'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
-    body: JSON.stringify({ items })
+    body: JSON.stringify({ items, paymentMethod })
   });
   if (!res.ok) throw new Error('Commande échouée');
   return res.json();

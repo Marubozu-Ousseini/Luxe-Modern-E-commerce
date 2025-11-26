@@ -22,6 +22,8 @@ export interface OrderRecord {
   total: number;
   currency: 'XAF';
   status: 'paid' | 'pending' | 'failed';
+  paymentMethod?: 'orange_money' | 'mtn_mobile_money' | 'on_delivery';
+  adminConfirmed?: boolean; // admin confirmation to ship
   createdAt: string;
 }
 
@@ -41,7 +43,7 @@ function writeOrders(orders: OrderRecord[]) {
   fs.writeFileSync(ordersFile, JSON.stringify(orders, null, 2));
 }
 
-export function createOrder(userId: string, products: Product[], cart: { productId: number; quantity: number }[]): OrderRecord {
+export function createOrder(userId: string, products: Product[], cart: { productId: number; quantity: number }[], paymentMethod?: 'orange_money' | 'mtn_mobile_money' | 'on_delivery'): OrderRecord {
   const items: OrderItem[] = cart.map(({ productId, quantity }) => {
     const product = products.find(p => p.id === productId);
     if (!product) throw new Error(`Produit introuvable: ${productId}`);
@@ -55,6 +57,8 @@ export function createOrder(userId: string, products: Product[], cart: { product
     total,
     currency: 'XAF',
     status: 'paid', // simulé
+    paymentMethod: paymentMethod ?? 'on_delivery',
+    adminConfirmed: false,
     createdAt: new Date().toISOString(),
   };
   const all = readOrders();
@@ -82,7 +86,7 @@ export function updateOrderStatus(id: string, status: OrderRecord['status']): Or
 }
 
 // === Async DB-backed variants ===
-export async function createOrderAsync(userId: string, products: Product[], cart: { productId: number; quantity: number }[]): Promise<OrderRecord> {
+export async function createOrderAsync(userId: string, products: Product[], cart: { productId: number; quantity: number }[], paymentMethod?: 'orange_money' | 'mtn_mobile_money' | 'on_delivery'): Promise<OrderRecord> {
   if (!isDbAvailable()) return createOrder(userId, products, cart);
   const items: OrderItem[] = cart.map(({ productId, quantity }) => {
     const product = products.find(p => p.id === productId);
@@ -97,9 +101,11 @@ export async function createOrderAsync(userId: string, products: Product[], cart
     total,
     currency: 'XAF',
     status: 'paid',
+    paymentMethod: paymentMethod ?? 'on_delivery',
+    adminConfirmed: false,
     createdAt: new Date().toISOString(),
   };
-  await query('INSERT INTO orders (id, user_id, total, currency, status, created_at) VALUES ($1,$2,$3,$4,$5,$6)', [order.id, userId, total, order.currency, order.status, order.createdAt]);
+  await query('INSERT INTO orders (id, user_id, total, currency, status, payment_method, admin_confirmed, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)', [order.id, userId, total, order.currency, order.status, order.paymentMethod, order.adminConfirmed, order.createdAt]);
   for (const it of items) {
     await query('INSERT INTO order_items (order_id, product_id, quantity, price) VALUES ($1,$2,$3,$4)', [order.id, it.productId, it.quantity, it.price]);
   }
@@ -108,18 +114,33 @@ export async function createOrderAsync(userId: string, products: Product[], cart
 
 export async function getOrdersByUserAsync(userId: string): Promise<OrderRecord[]> {
   if (!isDbAvailable()) return getOrdersByUser(userId);
-  const { rows } = await query<any>('SELECT id, user_id as "userId", total, currency, status, created_at as "createdAt" FROM orders WHERE user_id=$1 ORDER BY created_at DESC', [userId]);
+  const { rows } = await query<any>('SELECT id, user_id as "userId", total, currency, status, payment_method as "paymentMethod", admin_confirmed as "adminConfirmed", created_at as "createdAt" FROM orders WHERE user_id=$1 ORDER BY created_at DESC', [userId]);
   return rows;
 }
 
 export async function getAllOrdersAsync(): Promise<OrderRecord[]> {
   if (!isDbAvailable()) return getAllOrders();
-  const { rows } = await query<any>('SELECT id, user_id as "userId", total, currency, status, created_at as "createdAt" FROM orders ORDER BY created_at DESC');
+  const { rows } = await query<any>('SELECT id, user_id as "userId", total, currency, status, payment_method as "paymentMethod", admin_confirmed as "adminConfirmed", created_at as "createdAt" FROM orders ORDER BY created_at DESC');
   return rows;
 }
 
 export async function updateOrderStatusAsync(id: string, status: OrderRecord['status']): Promise<OrderRecord | undefined> {
   if (!isDbAvailable()) return updateOrderStatus(id, status);
-  const { rows } = await query<any>('UPDATE orders SET status=$2 WHERE id=$1 RETURNING id, user_id as "userId", total, currency, status, created_at as "createdAt"', [id, status]);
+  const { rows } = await query<any>('UPDATE orders SET status=$2 WHERE id=$1 RETURNING id, user_id as "userId", total, currency, status, payment_method as "paymentMethod", admin_confirmed as "adminConfirmed", created_at as "createdAt"', [id, status]);
   return rows[0];
+}
+
+export async function confirmOrderShipmentAsync(id: string): Promise<OrderRecord | undefined> {
+  if (!isDbAvailable()) return undefined;
+  const { rows } = await query<any>('UPDATE orders SET admin_confirmed = true WHERE id=$1 RETURNING id, user_id as "userId", total, currency, status, payment_method as "paymentMethod", admin_confirmed as "adminConfirmed", created_at as "createdAt"', [id]);
+  return rows[0];
+}
+
+export function confirmOrderShipment(id: string): OrderRecord | undefined {
+  const orders = readOrders();
+  const idx = orders.findIndex(o => o.id === id);
+  if (idx === -1) return undefined;
+  orders[idx].adminConfirmed = true;
+  writeOrders(orders);
+  return orders[idx];
 }

@@ -22,6 +22,8 @@ interface OrderRecord {
   total: number;
   currency: 'XAF';
   status: OrderStatus;
+  paymentMethod?: 'orange_money' | 'mtn_mobile_money' | 'on_delivery';
+  adminConfirmed?: boolean;
   createdAt: string;
 }
 
@@ -330,29 +332,7 @@ const AdminPage: React.FC = () => {
                 <input className="w-full border rounded px-3 py-2" placeholder="Ancien prix (XAF, optionnel)" type="number" value={Number(form.originalPrice ?? 0)} onChange={e=>setForm({...form, originalPrice: Number(e.target.value) || undefined})} />
                 <input className="w-full border rounded px-3 py-2" placeholder="Stock" type="number" value={form.stock ?? 0} onChange={e=>setForm({...form, stock: Number(e.target.value)})} />
                 <input className="w-full border rounded px-3 py-2" placeholder="Catégorie" value={form.category} onChange={e=>setForm({...form, category: e.target.value})} />
-                <div>
-                  <input className="w-full border rounded px-3 py-2" placeholder="Image URL" value={form.imageUrl} onChange={e=>setForm({...form, imageUrl: e.target.value})} />
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="mt-2 w-full text-sm"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      const reader = new FileReader();
-                      reader.onload = () => {
-                        const result = reader.result as string | null;
-                        if (result) setForm({ ...form, imageUrl: result });
-                      };
-                      reader.readAsDataURL(file);
-                    }}
-                  />
-                  {form.imageUrl && (
-                    <div className="mt-2">
-                      <img src={form.imageUrl} alt="Aperçu" className="max-h-40 object-contain rounded border" />
-                    </div>
-                  )}
-                </div>
+                <input className="w-full border rounded px-3 py-2" placeholder="Image URL" value={form.imageUrl} onChange={e=>setForm({...form, imageUrl: e.target.value})} />
                 <textarea className="w-full border rounded px-3 py-2" placeholder="Description" value={form.description} onChange={e=>setForm({...form, description: e.target.value})} />
                 <button className="btn-primary px-4 py-2">Créer</button>
               </form>
@@ -398,29 +378,7 @@ const AdminPage: React.FC = () => {
                     <input className="w-full border rounded px-3 py-2" type="number" placeholder="Ancien prix (XAF, optionnel)" value={Number(editing.originalPrice ?? 0)} onChange={e=>setEditing({...editing!, originalPrice: Number(e.target.value) || undefined})} />
                     <input className="w-full border rounded px-3 py-2" type="number" value={editing.stock ?? 0} onChange={e=>setEditing({...editing, stock: Number(e.target.value)})} />
                     <input className="w-full border rounded px-3 py-2" value={editing.category} onChange={e=>setEditing({...editing, category: e.target.value})} />
-                    <div>
-                      <input className="w-full border rounded px-3 py-2" value={editing.imageUrl} onChange={e=>setEditing({...editing, imageUrl: e.target.value})} />
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="mt-2 w-full text-sm"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (!file) return;
-                          const reader = new FileReader();
-                          reader.onload = () => {
-                            const result = reader.result as string | null;
-                            if (result) setEditing({ ...editing!, imageUrl: result });
-                          };
-                          reader.readAsDataURL(file);
-                        }}
-                      />
-                      {editing.imageUrl && (
-                        <div className="mt-2">
-                          <img src={editing.imageUrl} alt="Aperçu" className="max-h-40 object-contain rounded border" />
-                        </div>
-                      )}
-                    </div>
+                    <input className="w-full border rounded px-3 py-2" value={editing.imageUrl} onChange={e=>setEditing({...editing, imageUrl: e.target.value})} />
                     <textarea className="w-full border rounded px-3 py-2" value={editing.description} onChange={e=>setEditing({...editing, description: e.target.value})} />
                     <div className="flex gap-3 justify-end">
                       <button type="button" onClick={cancelEdit} className="px-4 py-2 border rounded">Annuler</button>
@@ -439,7 +397,7 @@ const AdminPage: React.FC = () => {
             {orderLoading ? <div>Chargement...</div> : (
               <table className="w-full text-left">
                 <thead>
-                  <tr className="border-b"><th className="py-2">ID</th><th>Client</th><th>Total</th><th>Statut</th><th>Date</th><th></th></tr>
+                  <tr className="border-b"><th className="py-2">ID</th><th>Client</th><th>Total</th><th>Paiement</th><th>Statut</th><th>Date</th><th></th></tr>
                 </thead>
                 <tbody>
                   {orders.map(o => (
@@ -447,16 +405,23 @@ const AdminPage: React.FC = () => {
                       <td className="py-2 text-xs">{o.id}</td>
                       <td className="text-xs">{o.userId}</td>
                       <td>{o.total.toLocaleString()} {o.currency}</td>
+                      <td className="text-sm">{o.paymentMethod === 'orange_money' ? 'Orange Money' : o.paymentMethod === 'mtn_mobile_money' ? 'MTN Mobile Money' : 'À la livraison'}</td>
                       <td>
                         <span className={`px-2 py-1 rounded text-xs font-semibold ${o.status === 'paid' ? 'bg-green-100 text-green-700' : o.status === 'failed' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>{o.status}</span>
                       </td>
                       <td className="text-sm">{new Date(o.createdAt).toLocaleString()}</td>
-                      <td>
+                      <td className="flex items-center gap-2">
                         <select className="border rounded px-2 py-1" value={o.status} onChange={e => changeOrderStatus(o.id, e.target.value as OrderStatus)}>
                           <option value="paid">payée</option>
                           <option value="pending">en attente</option>
                           <option value="failed">échouée</option>
                         </select>
+                        <button onClick={async () => {
+                          // confirm shipment
+                          const res = await fetch(apiUrl(`/api/admin/orders/${o.id}/confirm-shipment`), { method: 'PATCH', credentials: 'include' });
+                          if (!res.ok) { setError('Erreur lors de la confirmation'); return; }
+                          fetchOrders();
+                        }} className={`px-2 py-1 text-sm rounded border ${o.adminConfirmed ? 'bg-green-100 text-green-700' : ''}`}>{o.adminConfirmed ? 'Confirmé' : 'Confirmer'}</button>
                       </td>
                     </tr>
                   ))}
