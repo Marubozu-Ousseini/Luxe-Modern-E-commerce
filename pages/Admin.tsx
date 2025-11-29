@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import PageBackground from '../components/PageBackground.tsx';
+import PasswordToggle from '../components/PasswordToggle.tsx';
 import ProtectedRoute from '../components/ProtectedRoute';
 import { apiUrl } from '../services/apiClient';
 
@@ -95,6 +96,8 @@ const AdminPage: React.FC = () => {
   const [page, setPage] = useState(0);
   const pageSize = 5;
   const [editing, setEditing] = useState<Product | null>(null);
+  const [editForm, setEditForm] = useState<Product | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
 
   // Orders state
   const [orders, setOrders] = useState<OrderRecord[]>([]);
@@ -190,28 +193,38 @@ const AdminPage: React.FC = () => {
     if (!res.ok) { setError('Suppression échouée'); return; }
     fetchProducts();
   };
-  const startEdit = (p: Product) => setEditing(p);
-  const cancelEdit = () => setEditing(null);
+  const startEdit = (p: Product) => {
+    setEditing(p);
+    // create a local copy for the editing form so we don't mutate the list item directly
+    setEditForm({ ...p });
+  };
+  const cancelEdit = () => { setEditing(null); setEditForm(null); setEditSaving(false); };
   const saveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editing) return;
-    const res = await fetch(apiUrl(`/api/admin/produits/${editing.id}`), {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({
-        name: editing.name,
-        price: editing.price,
-        originalPrice: editing.originalPrice,
-        description: editing.description,
-        category: editing.category,
-        imageUrl: editing.imageUrl,
-        stock: editing.stock ?? 0,
-      })
-    });
-    if (!res.ok) { setError('Mise à jour échouée'); return; }
-    setEditing(null);
-    fetchProducts();
+    if (!editForm) return;
+    try {
+      setEditSaving(true);
+      const res = await fetch(apiUrl(`/api/admin/produits/${editForm.id}`), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          name: editForm.name,
+          price: editForm.price,
+          originalPrice: editForm.originalPrice,
+          description: editForm.description,
+          category: editForm.category,
+          imageUrl: editForm.imageUrl,
+          stock: editForm.stock ?? 0,
+        })
+      });
+      if (!res.ok) { setError('Mise à jour échouée'); return; }
+      setEditing(null);
+      setEditForm(null);
+      fetchProducts();
+    } finally {
+      setEditSaving(false);
+    }
   };
   const changeOrderStatus = async (id: string, status: OrderStatus) => {
     const res = await fetch(apiUrl(`/api/admin/orders/${id}`), {
@@ -334,7 +347,7 @@ const AdminPage: React.FC = () => {
                 <input className="w-full border rounded px-3 py-2" placeholder="Catégorie" value={form.category} onChange={e=>setForm({...form, category: e.target.value})} />
                 <input className="w-full border rounded px-3 py-2" placeholder="Image URL" value={form.imageUrl} onChange={e=>setForm({...form, imageUrl: e.target.value})} />
                 <textarea className="w-full border rounded px-3 py-2" placeholder="Description" value={form.description} onChange={e=>setForm({...form, description: e.target.value})} />
-                <button className="btn-primary px-4 py-2">Créer</button>
+                <button className="btn-primary px-4 py-2 active:scale-95 transition-transform">Créer</button>
               </form>
               <div className="mt-6">
                 <h3 className="font-semibold mb-2">Recherche & Pagination</h3>
@@ -360,29 +373,32 @@ const AdminPage: React.FC = () => {
                         <div className="text-sm text-gray-500">{p.price.toLocaleString()} XAF · Stock: {p.stock ?? 0}</div>
                       </div>
                       <div className="flex gap-3">
-                        <button onClick={() => startEdit(p)} className="text-blue-600">Éditer</button>
-                        <button onClick={() => removeProduct(p.id)} className="text-red-600">Supprimer</button>
+                        <button onClick={() => startEdit(p)} className="text-blue-600 active:scale-95 transition-transform">Éditer</button>
+                        <button onClick={() => removeProduct(p.id)} className="text-red-600 active:scale-95 transition-transform">Supprimer</button>
                       </div>
                     </li>
                   ))}
                 </ul>
               )}
             </div>
-            {editing && (
+            {editing && editForm && (
               <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
                 <div className="bg-white p-6 rounded w-full max-w-lg">
-                  <h2 className="font-semibold mb-4">Modifier produit #{editing.id}</h2>
+                  <h2 className="font-semibold mb-4">Modifier produit #{editForm.id}</h2>
                   <form onSubmit={saveEdit} className="space-y-3">
-                    <input className="w-full border rounded px-3 py-2" value={editing.name} onChange={e=>setEditing({...editing, name: e.target.value})} />
-                    <input className="w-full border rounded px-3 py-2" type="number" value={editing.price} onChange={e=>setEditing({...editing, price: Number(e.target.value)})} />
-                    <input className="w-full border rounded px-3 py-2" type="number" placeholder="Ancien prix (XAF, optionnel)" value={Number(editing.originalPrice ?? 0)} onChange={e=>setEditing({...editing!, originalPrice: Number(e.target.value) || undefined})} />
-                    <input className="w-full border rounded px-3 py-2" type="number" value={editing.stock ?? 0} onChange={e=>setEditing({...editing, stock: Number(e.target.value)})} />
-                    <input className="w-full border rounded px-3 py-2" value={editing.category} onChange={e=>setEditing({...editing, category: e.target.value})} />
-                    <input className="w-full border rounded px-3 py-2" value={editing.imageUrl} onChange={e=>setEditing({...editing, imageUrl: e.target.value})} />
-                    <textarea className="w-full border rounded px-3 py-2" value={editing.description} onChange={e=>setEditing({...editing, description: e.target.value})} />
+                    <input className="w-full border rounded px-3 py-2" value={editForm.name} onChange={e=>setEditForm({...editForm, name: e.target.value})} />
+                    <input className="w-full border rounded px-3 py-2" type="number" value={editForm.price} onChange={e=>setEditForm({...editForm, price: Number(e.target.value)})} />
+                    <input className="w-full border rounded px-3 py-2" type="number" placeholder="Ancien prix (XAF, optionnel)" value={editForm.originalPrice ?? ''} onChange={e=>{
+                      const v = e.target.value;
+                      setEditForm({...editForm, originalPrice: v === '' ? undefined : Number(v)});
+                    }} />
+                    <input className="w-full border rounded px-3 py-2" type="number" value={editForm.stock ?? 0} onChange={e=>setEditForm({...editForm, stock: Number(e.target.value)})} />
+                    <input className="w-full border rounded px-3 py-2" value={editForm.category} onChange={e=>setEditForm({...editForm, category: e.target.value})} />
+                    <input className="w-full border rounded px-3 py-2" value={editForm.imageUrl} onChange={e=>setEditForm({...editForm, imageUrl: e.target.value})} />
+                    <textarea className="w-full border rounded px-3 py-2" value={editForm.description} onChange={e=>setEditForm({...editForm, description: e.target.value})} />
                     <div className="flex gap-3 justify-end">
-                      <button type="button" onClick={cancelEdit} className="px-4 py-2 border rounded">Annuler</button>
-                      <button className="px-4 py-2 bg-black text-white rounded">Sauvegarder</button>
+                      <button type="button" onClick={cancelEdit} disabled={editSaving} className="px-4 py-2 border rounded active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed">Annuler</button>
+                      <button disabled={editSaving} className="px-4 py-2 bg-black text-white rounded active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed">{editSaving ? 'Sauvegarde...' : 'Sauvegarder'}</button>
                     </div>
                   </form>
                 </div>
@@ -509,9 +525,8 @@ const AdminPage: React.FC = () => {
           >
             <div>
               <label className="block text-sm mb-1" htmlFor="currentPassword">Mot de passe actuel</label>
-              <input
+              <PasswordToggle
                 id="currentPassword"
-                type="password"
                 className="w-full border rounded px-3 py-2"
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
@@ -519,9 +534,8 @@ const AdminPage: React.FC = () => {
             </div>
             <div>
               <label className="block text-sm mb-1" htmlFor="newPassword">Nouveau mot de passe</label>
-              <input
+              <PasswordToggle
                 id="newPassword"
-                type="password"
                 className="w-full border rounded px-3 py-2"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
@@ -783,7 +797,7 @@ const AdminPage: React.FC = () => {
                 </fieldset>
                 <div className="flex gap-3">
                   <button className="btn-primary px-4 py-2">Enregistrer</button>
-                  <button type="button" className="px-4 py-2 border rounded" onClick={(ev) => {
+                  <button type="button" className="px-4 py-2 border rounded active:scale-95 transition-transform" onClick={(ev) => {
                     const form = (ev.currentTarget as HTMLButtonElement).closest('form') as HTMLFormElement;
                     if (!form) return;
                     const fd = new FormData(form);

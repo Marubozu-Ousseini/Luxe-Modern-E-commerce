@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import PasswordToggle from '../components/PasswordToggle';
 
 const RegisterPage: React.FC = () => {
   const [name, setName] = useState('');
@@ -33,7 +34,7 @@ const RegisterPage: React.FC = () => {
           <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" className="w-full px-3 py-2 border rounded" />
           <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="Téléphone" className="w-full px-3 py-2 border rounded" />
           <input value={town} onChange={e => setTown(e.target.value)} placeholder="Ville" className="w-full px-3 py-2 border rounded" />
-          <input value={password} onChange={e => setPassword(e.target.value)} placeholder="Mot de passe" type="password" className="w-full px-3 py-2 border rounded" />
+          <PasswordToggle value={password} onChange={e => setPassword(e.target.value)} placeholder="Mot de passe" className="w-full px-3 py-2 border rounded" />
           <button className="w-full btn-primary py-2.5">Créer un compte</button>
         </form>
   <p className="mt-4 text-sm text-gray-600">Déjà un compte ? <Link to="/login" className="text-accent hover:opacity-90">Connectez-vous</Link></p>

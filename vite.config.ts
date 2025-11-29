@@ -9,7 +9,8 @@ export default defineConfig(({ mode }) => {
         port: 3000,
         host: '0.0.0.0',
         proxy: {
-          '/api': 'http://localhost:8081'
+          // During local dev we run the backend on 8082 when 8081 is unavailable
+          '/api': 'http://localhost:8082'
         }
       },
       plugins: [react()],
