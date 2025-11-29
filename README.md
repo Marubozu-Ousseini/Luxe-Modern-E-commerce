@@ -93,6 +93,26 @@ L'application est conçue pour fonctionner sur une seule instance (ex: GCE e2-mi
     ```
     Le fichier `ecosystem.config.cjs` est configuré pour lancer l'application en mode `cluster` pour une meilleure performance.
 
+## Updating the Admin Password (Recommended)
+
+- Use Secret Manager to update the `admin-password` secret rather than editing files inside the container.
+- Example: create a new secret version with the new password and then update the Cloud Run service to reference the `latest` version:
+
+```bash
+# add a new version with the new admin password (stdin)
+echo -n 'NewStrongPass!' | gcloud secrets versions add admin-password --data-file=- --project=$PROJECT_ID
+
+# tell Cloud Run to use the latest secret version for the runtime env var
+gcloud run services update $SERVICE --update-secrets=ADMIN_PASSWORD=admin-password:latest --region=$REGION --project=$PROJECT_ID
+```
+
+- Once the new revision is up, you can (optionally) disable older secret versions for extra safety:
+
+```bash
+gcloud secrets versions disable <VERSION_NUMBER> --secret=admin-password --project=$PROJECT_ID
+```
+
+This approach avoids baking credentials into images or editing runtime files inside containers. It seeds or updates the admin account on service startup when the app reads `ADMIN_PASSWORD` from the environment.
 ## Accès Admin et Backend
 
 - URL publique du site: `https://www.malafaareh.com`
