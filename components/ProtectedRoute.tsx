@@ -8,8 +8,8 @@ interface Props {
 }
 
 const ProtectedRoute: React.FC<Props> = ({ children, requireAdmin = false }) => {
-  const { user, loading } = useAuth();
-  if (loading) return <div className="p-8 text-center">Chargement...</div>;
+  const { user, loading, initializing } = useAuth();
+  if (loading || initializing) return <div className="p-8 text-center">Chargement...</div>;
   if (!user) return <Navigate to="/login" replace />;
   if (requireAdmin && user.role !== 'admin') return <div className="p-8 text-center text-red-500">Accès réservé aux administrateurs</div>;
   return children;

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useMemo, useEffect } from 'react';
 import * as AuthAPI from '../services/authClient';
-import { onAuthChange, getCurrentIdToken, loginWithEmail as fbLoginWithEmail, registerWithEmail as fbRegisterWithEmail, logoutFirebase, loginWithGoogle as fbLoginWithGoogle } from '../services/firebaseClient';
+import { initFirebaseClient, onAuthChange, getCurrentIdToken, loginWithEmail as fbLoginWithEmail, registerWithEmail as fbRegisterWithEmail, logoutFirebase, loginWithGoogle as fbLoginWithGoogle } from '../services/firebaseClient';
 
 type Role = 'user' | 'admin';
 
@@ -14,6 +14,7 @@ export interface AuthUser {
 interface AuthContextShape {
   user: AuthUser | null;
   loading: boolean;
+  initializing: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
   loginWithGoogle?: () => Promise<any>;
@@ -25,23 +26,68 @@ const AuthContext = createContext<AuthContextShape | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(false);
+  const [initializing, setInitializing] = useState(true);
+  // Persisted key for quick UI rehydration across refreshes. Server session is still
+  // authoritative; we call `/api/auth/me` to validate and overwrite this cached value.
+  const STORAGE_KEY = 'luxe:auth:user';
 
   useEffect(() => {
+    // Rehydrate from localStorage immediately for smoother UX
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as AuthUser;
+        setUser(parsed);
+      }
+    } catch (_) {
+      // ignore malformed storage
+    }
+
+    // Verify server session (cookie) and replace cached user with authoritative data.
+    (async () => {
+      try {
+        const me = await AuthAPI.me();
+        if (me) {
+          setUser(me);
+          try { localStorage.setItem(STORAGE_KEY, JSON.stringify(me)); } catch (_) { /* ignore */ }
+        } else {
+          setUser(null);
+          try { localStorage.removeItem(STORAGE_KEY); } catch (_) { /* ignore */ }
+        }
+      } catch (_) {
+        // If the validation call fails, keep the rehydrated user temporarily but do not trust it.
+      } finally {
+        setInitializing(false);
+      }
+    })();
+
     // Subscribe to Firebase auth changes if configured
-    const unsub = onAuthChange(async (fbUser) => {
-      if (!fbUser) {
-        setUser(null);
-        return;
+    let unsub: (() => void) | null = null;
+    (async () => {
+      try {
+        await initFirebaseClient();
+        const maybeUnsub = await onAuthChange(async (fbUser) => {
+          if (!fbUser) {
+            setUser(null);
+            try { localStorage.removeItem(STORAGE_KEY); } catch (_) { /* ignore */ }
+            return;
+          }
+          const token = await getCurrentIdToken();
+          const role = (fbUser?.admin || fbUser?.role) ? (fbUser.admin ? 'admin' : (fbUser.role || 'user')) : 'user';
+          const u = { id: fbUser.uid, email: fbUser.email || '', name: fbUser.displayName || undefined, role };
+          setUser(u);
+          try { localStorage.setItem(STORAGE_KEY, JSON.stringify(u)); } catch (_) { /* ignore */ }
+          // Optionally notify backend about login or sync user
+          if (token) {
+            try { await AuthAPI.setIdToken(token); } catch (e) { /* ignore */ }
+          }
+        });
+        if (typeof maybeUnsub === 'function') unsub = maybeUnsub;
+      } catch (e) {
+        // ignore
       }
-      const token = await getCurrentIdToken();
-      const role = (fbUser?.admin || fbUser?.role) ? (fbUser.admin ? 'admin' : (fbUser.role || 'user')) : 'user';
-      setUser({ id: fbUser.uid, email: fbUser.email || '', name: fbUser.displayName || undefined, role });
-      // Optionally notify backend about login or sync user
-      if (token) {
-        try { await AuthAPI.setIdToken(token); } catch (e) { /* ignore */ }
-      }
-    });
-    return () => unsub && unsub();
+    })();
+    return () => { try { if (unsub) unsub(); } catch (_) { /* ignore */ } };
   }, []);
 
   const login = async (email: string, password: string) => {
@@ -52,12 +98,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const fbUser = await fbLoginWithEmail(email, password);
         const token = await getCurrentIdToken();
         const role = fbUser?.admin ? 'admin' : 'user';
-        setUser({ id: fbUser.uid, email: fbUser.email || '', name: fbUser.displayName || undefined, role });
+        const u = { id: fbUser.uid, email: fbUser.email || '', name: fbUser.displayName || undefined, role };
+        setUser(u);
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(u)); } catch (_) { /* ignore */ }
         if (token) await AuthAPI.setIdToken(token);
         return;
       } catch (_) {
         const data = await AuthAPI.login(email, password);
         setUser(data);
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch (_) { /* ignore */ }
       }
     } finally {
       setLoading(false);
@@ -71,7 +120,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const fbUser = await fbLoginWithGoogle();
         const token = await getCurrentIdToken();
         const role = fbUser?.admin ? 'admin' : 'user';
-        setUser({ id: fbUser.uid, email: fbUser.email || '', name: fbUser.displayName || undefined, role });
+        const u = { id: fbUser.uid, email: fbUser.email || '', name: fbUser.displayName || undefined, role };
+        setUser(u);
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(u)); } catch (_) { /* ignore */ }
         // Log Google account sign-in for debugging/observability
         // eslint-disable-next-line no-console
         console.info('[auth] Google sign-in:', { uid: fbUser.uid, email: fbUser.email, name: fbUser.displayName });
@@ -92,12 +143,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const fbUser = await fbRegisterWithEmail(email, password);
         const token = await getCurrentIdToken();
-        setUser({ id: fbUser.uid, email: fbUser.email || '', name, role: 'user' });
+        const u = { id: fbUser.uid, email: fbUser.email || '', name, role: 'user' };
+        setUser(u);
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(u)); } catch (_) { /* ignore */ }
         if (token) await AuthAPI.setIdToken(token);
         return;
       } catch (_) {
         const data = await AuthAPI.register(name, email, password);
         setUser(data);
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch (_) { /* ignore */ }
       }
     } finally {
       setLoading(false);
@@ -108,9 +162,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try { await logoutFirebase(); } catch (_) { /* ignore */ }
     try { await AuthAPI.logout(); } catch (_) { /* ignore */ }
     setUser(null);
+    try { localStorage.removeItem(STORAGE_KEY); } catch (_) { /* ignore */ }
   };
 
-  const value = useMemo(() => ({ user, loading, login, register, loginWithGoogle, logout }), [user, loading]);
+  const value = useMemo(() => ({ user, loading, initializing, login, register, loginWithGoogle, logout }), [user, loading, initializing]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

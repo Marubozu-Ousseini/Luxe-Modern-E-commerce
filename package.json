@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node dist/server.js",
     "dev": "concurrently \"npm:dev:server\" \"npm:dev:client\"",
-  "dev:server": "PORT=8081 tsx watch src-server/server.ts",
+    "dev:server": "tsx watch src-server/server.ts",
     "dev:client": "vite",
     "build": "npm run build:client && npm run build:server",
     "build:server": "tsc -p tsconfig.server.json",
@@ -52,6 +52,8 @@
     "winston": "^3.13.0",
     "zod": "^3.23.8",
     "stripe": "^19.3.1"
+    ,
+    "multer": "^2.0.0"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.4.2",
@@ -79,7 +81,5 @@
     "vite": "^5.4.8",
     "vitest": "^4.0.9"
   },
-  "optionalDependencies": {
-    "multer": "^1.4.5-lts.1"
-  }
+  "optionalDependencies": {}
 }
