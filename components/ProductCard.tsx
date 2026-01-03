@@ -2,7 +2,8 @@ import React from 'react';
 import { Product } from '../types.ts';
 import { usePromotions } from '../context/PromotionsContext.tsx';
 import { useFavorites } from '../context/FavoritesContext.tsx';
-import { CartIcon, StarIcon, HeartIcon } from './Icons.tsx';
+import { CartIcon, HeartIcon } from './Icons.tsx';
+import Badges from './Badges.tsx';
 import { formatCurrency } from '../src/utils/formatter.ts';
 
 interface ProductCardProps {
@@ -30,8 +31,13 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onSelect, onAddToCar
         <img
           src={product.imageUrl}
           alt={product.name}
+          loading="lazy"
+          width={800}
+          height={1000}
           className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 ease-premium group-hover:scale-[1.04]"
         />
+        {/* Marketing badges: best-seller, promo, nouveau, limité */}
+        <Badges product={product} />
         {/* Favorites + Stickers overlay (top-right) */}
         <div className="absolute top-3 right-3 z-10 flex flex-col items-end gap-2">
           <button
@@ -47,7 +53,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onSelect, onAddToCar
                 s.href ? (
                   <a key={s.id} href={s.href} onClick={e => e.stopPropagation()} className="inline-flex items-center justify-center">
                     {s.imageUrl ? (
-                      <img src={s.imageUrl} alt={s.text || s.id} className="h-10 w-10 object-contain drop-shadow-md rounded" />
+                      <img src={s.imageUrl} alt={s.text || s.id} loading="lazy" className="h-10 w-10 object-contain drop-shadow-md rounded" />
                     ) : (
                       <span className="inline-block text-[11px] px-2 py-1 rounded-full bg-white/85 backdrop-blur border border-gray-200 text-slate-700 shadow-sm">
                         {s.text || s.id}
@@ -57,7 +63,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onSelect, onAddToCar
                 ) : (
                   <span key={s.id} className="inline-flex items-center justify-center">
                     {s.imageUrl ? (
-                      <img src={s.imageUrl} alt={s.text || s.id} className="h-10 w-10 object-contain drop-shadow-md rounded" />
+                      <img src={s.imageUrl} alt={s.text || s.id} loading="lazy" className="h-10 w-10 object-contain drop-shadow-md rounded" />
                     ) : (
                       <span className="inline-block text-[11px] px-2 py-1 rounded-full bg-white/85 backdrop-blur border border-gray-200 text-slate-700 shadow-sm">
                         {s.text || s.id}
@@ -70,7 +76,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onSelect, onAddToCar
           )}
         </div>
         {product.limitedAvailability && (
-          <span className="absolute top-3 left-3 z-10 inline-block text-[11px] px-2 py-1 rounded-full bg-white/85 backdrop-blur border border-gray-200 text-slate-700">
+          <span className="absolute top-3 left-3 z-10 inline-block text-[11px] px-2 py-1 rounded-full bg-white/85 backdrop-blur border border-sand text-slate-700">
             Disponibilité limitée
           </span>
         )}
@@ -89,20 +95,17 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onSelect, onAddToCar
           {product.name}
         </h3>
         <p className="text-sm text-taupe mt-1">{product.category}</p>
-    <div className="flex items-center mt-2 text-slate-600">
-      <StarIcon className="w-4 h-4 text-canary glossy-star" />
-            <span className="text-sm ml-1">{product.rating.rate}</span>
-            <span className="text-sm text-slate-400 ml-1.5">({product.rating.count})</span>
-        </div>
         <div className="mt-4 flex-grow" />
         <div className="flex items-center justify-between mt-4">
           <div className="flex flex-col">
-            {product.originalPrice && product.originalPrice > product.price && (
-              <span className="text-sm line-through text-slate-400">{formatCurrency(product.originalPrice)}</span>
-            )}
-            <p className="text-xl font-semibold text-gold">{formatCurrency(product.price)}</p>
-            {product.originalPrice && product.originalPrice > product.price && (
-              <span className="mt-1 inline-block text-[11px] px-2 py-0.5 rounded-full bg-gold/15 text-gold font-medium">Prix spécial</span>
+            {product.originalPrice && product.originalPrice > product.price ? (
+              <div className="flex flex-col">
+                <span className="text-sm line-through text-red-600">{formatCurrency(product.originalPrice)}</span>
+                <span className="text-xl font-semibold text-black">{formatCurrency(product.price)}</span>
+                <span className="text-sm text-green-600 animate-pulse">Vous gagnez {formatCurrency(product.originalPrice - product.price)}</span>
+              </div>
+            ) : (
+              <p className="text-xl font-semibold text-black">{formatCurrency(product.price)}</p>
             )}
           </div>
           <button

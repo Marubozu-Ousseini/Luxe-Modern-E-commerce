@@ -15,7 +15,17 @@ interface CartProps {
 
 const Cart: React.FC<CartProps> = ({ isOpen, onClose, items, onUpdateQuantity, onRemove }) => {
   const [paymentMethod, setPaymentMethod] = useState<'orange_money' | 'mtn_mobile_money' | 'on_delivery'>('on_delivery');
+  const [couponCode, setCouponCode] = useState<string>('');
+  const [couponApplied, setCouponApplied] = useState<{ code: string; type: 'percent' | 'amount'; value: number } | null>(null);
   const subtotal = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+  const originalSubtotal = items.reduce((sum, item) => sum + (item.product.originalPrice ?? item.product.price) * item.quantity, 0);
+  const savingsFromOriginal = Math.max(0, originalSubtotal - subtotal);
+  const couponDiscount = (() => {
+    if (!couponApplied) return 0;
+    if (couponApplied.type === 'percent') return Math.round(subtotal * (couponApplied.value / 100));
+    return Math.min(subtotal, couponApplied.value);
+  })();
+  const totalAfterDiscount = Math.max(0, subtotal - couponDiscount);
 
   return (
     <>
@@ -56,13 +66,23 @@ const Cart: React.FC<CartProps> = ({ isOpen, onClose, items, onUpdateQuantity, o
                 {items.map(item => (
                   <li key={item.product.id} className="flex py-6">
                     <div className="h-24 w-24 flex-shrink-0 overflow-hidden rounded-md border border-gray-200">
-                      <img src={item.product.imageUrl} alt={item.product.name} className="h-full w-full object-cover object-center" />
+                      <img src={item.product.imageUrl} alt={item.product.name} loading="lazy" className="h-full w-full object-cover object-center" />
                     </div>
                     <div className="ml-4 flex flex-1 flex-col">
                       <div>
                         <div className="flex justify-between text-base font-medium text-gray-900">
                           <h3>{item.product.name}</h3>
-                          <p className="ml-4">{formatCurrency(item.product.price * item.quantity)}</p>
+                          <div className="ml-4 text-right">
+                            {item.product.originalPrice && item.product.originalPrice > item.product.price ? (
+                              <div className="flex flex-col items-end">
+                                <span className="text-xs line-through text-red-600">{formatCurrency(item.product.originalPrice * item.quantity)}</span>
+                                <span className="text-base font-semibold text-black">{formatCurrency(item.product.price * item.quantity)}</span>
+                                <span className="text-xs text-green-600 animate-pulse">Vous gagnez {formatCurrency((item.product.originalPrice - item.product.price) * item.quantity)}</span>
+                              </div>
+                            ) : (
+                              <span className="text-base font-semibold text-black">{formatCurrency(item.product.price * item.quantity)}</span>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <div className="flex flex-1 items-end justify-between text-sm">
@@ -86,13 +106,63 @@ const Cart: React.FC<CartProps> = ({ isOpen, onClose, items, onUpdateQuantity, o
 
           {items.length > 0 && (
             <div className="border-t border-gray-200 p-6">
-              <div className="flex justify-between text-lg font-semibold text-gray-900">
-                <p>Sous-total</p>
-                <p>{formatCurrency(subtotal)}</p>
+              <div className="space-y-2">
+                <div className="flex justify-between text-lg font-semibold text-gray-900">
+                  <p>Sous-total</p>
+                  <p>{formatCurrency(subtotal)}</p>
+                </div>
+                {savingsFromOriginal > 0 && (
+                  <div className="flex justify-between text-sm text-emerald-700">
+                    <p>Vous gagnez vs. prix d'origine</p>
+                    <p>-{formatCurrency(savingsFromOriginal)}</p>
+                  </div>
+                )}
+                {couponApplied && couponDiscount > 0 && (
+                  <div className="flex justify-between text-sm text-blue-700">
+                    <p>Coupon ({couponApplied.code})</p>
+                    <p>-{formatCurrency(couponDiscount)}</p>
+                  </div>
+                )}
+                {couponApplied && (
+                  <div className="flex justify-between text-base font-semibold text-gray-900 pt-2 border-t border-gray-200">
+                    <p>Total après remise</p>
+                    <p>{formatCurrency(totalAfterDiscount)}</p>
+                  </div>
+                )}
               </div>
               <p className="mt-2 text-sm text-slate-600">Frais de port et taxes calculés à la caisse. Paiement sécurisé. Retours offerts sous 14 jours.</p>
               <div className="mt-6">
                 <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm mb-1">Code promo</label>
+                    <div className="flex gap-2">
+                      <input
+                        value={couponCode}
+                        onChange={e=>setCouponCode(e.target.value)}
+                        className="flex-1 border rounded px-3 py-2"
+                        placeholder="Ex: SAVE10, SAVE20, GIFT-XXXX"
+                      />
+                      <button
+                        type="button"
+                        className="px-3 py-2 border rounded"
+                        onClick={() => {
+                          const code = couponCode.trim().toUpperCase();
+                          if (!code) { setCouponApplied(null); return; }
+                          // Simple demo rules: SAVE10/20 = percent; GIFT-XXXX = 1000 XAF
+                          if (code === 'SAVE10') setCouponApplied({ code, type: 'percent', value: 10 });
+                          else if (code === 'SAVE20') setCouponApplied({ code, type: 'percent', value: 20 });
+                          else if (code.startsWith('GIFT-')) setCouponApplied({ code, type: 'amount', value: 1000 });
+                          else {
+                            alert('Code promo invalide');
+                            setCouponApplied(null);
+                          }
+                        }}
+                      >Appliquer</button>
+                    </div>
+                    {couponApplied && (
+                      <p className="mt-1 text-xs text-slate-600">Remise appliquée: {couponApplied.type === 'percent' ? `${couponApplied.value}%` : `${formatCurrency(couponApplied.value)}`} · Total: {formatCurrency(totalAfterDiscount)}</p>
+                    )}
+                  </div>
                   <div>
                     <label className="block text-sm mb-1">Mode de paiement</label>
                     <select value={paymentMethod} onChange={e=>setPaymentMethod(e.target.value as any)} className="w-full border rounded px-3 py-2">
@@ -105,7 +175,7 @@ const Cart: React.FC<CartProps> = ({ isOpen, onClose, items, onUpdateQuantity, o
                     ev.preventDefault();
                     try {
                       const payload = items.map(i => ({ productId: i.product.id, quantity: i.quantity }));
-                      const order = await createOrder(payload, paymentMethod);
+                      const order = await createOrder(payload, paymentMethod, couponApplied?.code);
                       // navigate to orders page
                       window.location.href = '/orders';
                     } catch (err: any) {

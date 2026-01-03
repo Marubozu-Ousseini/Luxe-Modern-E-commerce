@@ -1,29 +1,47 @@
-# Cloud Build configuration for building and deploying the Luxe API to Cloud Run
-# Assumes Artifact Registry repo already exists (set _REGION and _REPO vars)
-# Substitutions expected:
-# _REGION=us-central1
-# _SERVICE_NAME=luxe-api
-# _REPO=luxe-repo
-# _PROJECT_ID=your-gcp-project
-# _IMAGE_TAG=latest (or CI commit SHA)
-# Optionally: _RUN_REGION=us-central1
+# Cloud Build configuration for building and deploying the Luxe API + static frontend
+# Substitutions:
+#   _REGION, _RUN_REGION, _PROJECT_ID, _REPO, _SERVICE_NAME, _IMAGE_TAG, _RUN_TESTS,
+#   _RUN_MIGRATIONS, _DEPLOY_STATIC, _STATIC_BUCKET
 
 substitutions:
   _REGION: "europe-west1"
-  _SERVICE_NAME: "luxe-modern-e-commerce"
+  _RUN_REGION: "europe-west1"
+  _SERVICE_NAME: "luxe-modern-ecommerce-api"
   _REPO: "luxe-repo"
-  _PROJECT_ID: "aerobic-botany-479212-s7"
+  _PROJECT_ID: "malafaareh-481713"
   _IMAGE_TAG: "latest"
   _RUN_TESTS: "true"
   _RUN_MIGRATIONS: "false"
+  _DEPLOY_STATIC: "false"
+  _STATIC_BUCKET: ""
+  _DEPLOY_CLOUD_RUN: "false"
+
+options:
+  substitutionOption: ALLOW_LOOSE
+  dynamicSubstitutions: true
+  logging: CLOUD_LOGGING_ONLY
 
 steps:
-  - name: 'gcr.io/cloud-builders/npm'
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'Configure gcloud'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        gcloud config set project $_PROJECT_ID
+        gcloud config set run/platform managed
+        gcloud config set run/region ${_RUN_REGION:-$_REGION}
+        gcloud --version
+  - name: 'node:20'
     id: 'Install deps'
-    args: ['ci']
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "Installing dependencies via npm install" && npm install --no-audit --no-fund
 
-  - name: 'gcr.io/cloud-builders/npm'
-    id: 'Run tests'
+  - name: 'node:20'
+    id: 'Run unit tests'
     entrypoint: 'bash'
     args:
       - '-c'
@@ -31,11 +49,10 @@ steps:
         if [ "$_RUN_TESTS" = "true" ]; then
           npm run test
         else
-          echo "Skipping tests (set _RUN_TESTS=true to enable)"
+          echo "Skipping unit tests"
         fi
 
-  # Run smoke tests specifically (keeps them separate so CI can surface quick failures)
-  - name: 'gcr.io/cloud-builders/npm'
+  - name: 'node:20'
     id: 'Run smoke tests'
     entrypoint: 'bash'
     args:
@@ -44,24 +61,49 @@ steps:
         if [ "$_RUN_TESTS" = "true" ]; then
           npm run test -- tests/smoke_cart.spec.ts
         else
-          echo "Skipping smoke tests (set _RUN_TESTS=true to enable)"
+          echo "Skipping smoke tests"
         fi
 
-  - name: 'gcr.io/cloud-builders/docker'
-    id: 'Build image'
+  - name: 'node:20'
+    id: 'Build client bundle'
+    entrypoint: 'bash'
     args:
-      - 'build'
-      - '-t'
-      - '$_REGION-docker.pkg.dev/$_PROJECT_ID/$_REPO/$_SERVICE_NAME:$_IMAGE_TAG'
-      - '.'
+      - '-c'
+      - |
+        npm run build:client
 
-  - name: 'gcr.io/cloud-builders/docker'
-    id: 'Push image (SHA)'
+  - name: 'node:20'
+    id: 'Build server bundle'
+    entrypoint: 'bash'
     args:
-      - 'push'
-      - '$_REGION-docker.pkg.dev/$_PROJECT_ID/$_REPO/$_SERVICE_NAME:$_IMAGE_TAG'
+      - '-c'
+      - |
+        npm run build:server
 
-  # Optional: run migrations inside a temporary container (requires DATABASE_URL secret)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'Sync static assets'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        if [ "$_DEPLOY_STATIC" = "true" ] && [ -n "$_STATIC_BUCKET" ]; then
+          echo "Uploading SPA to gs://$_STATIC_BUCKET"
+          gsutil -m rsync -r dist/client gs://$_STATIC_BUCKET
+        else
+          echo "Skipping static upload"
+        fi
+
+  - name: 'gcr.io/kaniko-project/executor:latest'
+    id: 'Build & push image'
+    env:
+      - 'DOCKER_CONFIG=/workspace/.docker/'
+    args:
+      - '--context=.'
+      - '--dockerfile=./Dockerfile'
+      - '--destination=$_REGION-docker.pkg.dev/$_PROJECT_ID/$_REPO/$_SERVICE_NAME:$_IMAGE_TAG'
+      - '--cache=true'
+      - '--cache-ttl=48h'
+
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'Run migrations'
     entrypoint: 'bash'
@@ -69,13 +111,11 @@ steps:
       - '-c'
       - |
         if [ "$_RUN_MIGRATIONS" = "true" ]; then
-          echo "Running migrations..."
-          # Retrieve DATABASE_URL from Secret Manager at runtime. This requires Secret Manager API
-          # enabled and the Cloud Build service account to have secret accessor role.
+          echo "Running migrations via Cloud SQL connector"
           export DATABASE_URL="$(gcloud secrets versions access latest --secret=DATABASE_URL --project=$_PROJECT_ID)"
-          node dist/migrate.js || echo "Migration script not found or failed"
+          node dist/scripts/migrate.js
         else
-          echo "Skipping migrations (set _RUN_MIGRATIONS=true to enable)"
+          echo "Skipping DB migrations"
         fi
 
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -84,12 +124,23 @@ steps:
     args:
       - '-c'
       - |
-        gcloud run deploy $_SERVICE_NAME \
-          --image $_REGION-docker.pkg.dev/$_PROJECT_ID/$_REPO/$_SERVICE_NAME:$_IMAGE_TAG \
-          --region ${_RUN_REGION:-$_REGION} \
-          --platform managed \
-          --allow-unauthenticated \
-          --set-env-vars=NODE_ENV=production
+        if [ "$_DEPLOY_CLOUD_RUN" = "true" ]; then
+          gcloud run deploy $_SERVICE_NAME \
+            --image $_REGION-docker.pkg.dev/$_PROJECT_ID/$_REPO/$_SERVICE_NAME:$_IMAGE_TAG \
+            --region ${_RUN_REGION:-$_REGION} \
+            --platform managed \
+            --no-allow-unauthenticated \
+            --service-account=cloud-run-runtime@$_PROJECT_ID.iam.gserviceaccount.com \
+            --impersonate-service-account=cloud-run-runtime@$_PROJECT_ID.iam.gserviceaccount.com \
+            --concurrency=80 \
+            --cpu=1 \
+            --memory=512Mi \
+            --min-instances=0 \
+            --max-instances=5 \
+            --set-env-vars=NODE_ENV=production \
+            --project $_PROJECT_ID \
+            --quiet
+        else
+          echo "Skipping Cloud Run deploy"
+        fi
 
-images:
-  - '$_REGION-docker.pkg.dev/$_PROJECT_ID/$_REPO/$_SERVICE_NAME:$_IMAGE_TAG'

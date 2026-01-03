@@ -33,6 +33,9 @@ export interface PromotionsState {
   marqueeSpeedSeconds?: number; // animation speed for scrolling banner
   glowEnabled?: boolean; // toggle glow pulse
   stickers?: { id: string; text?: string; imageUrl?: string; href?: string }[]; // small promotional stickers
+  adBanner?: { active: boolean; text: string; link?: string };
+  adBanners?: Array<{ id: string; active: boolean; text: string; link?: string }>;
+  labels?: Array<{ id: number; text: string; slug: string; type: 'discount'|'status'|'offer'|'urgency'; color_hint: string; description: string }>;
   updatedAt: string; // ISO date
 }
 
@@ -63,6 +66,22 @@ const defaultState: PromotionsState = {
   stickers: [
     { id: 'sticker-new', text: 'Nouveau', imageUrl: undefined },
     { id: 'sticker-offer', text: 'Offre Spéciale', imageUrl: undefined },
+  ],
+  adBanner: { active: false, text: 'Votre annonce ici', link: undefined },
+  adBanners: [
+    { id: 'ad-1', active: false, text: 'Votre annonce ici', link: undefined },
+  ],
+  labels: [
+    { id: 1, text: 'Soldes', slug: 'soldes', type: 'discount', color_hint: '#E74C3C', description: 'Article promotionnel général en réduction.' },
+    { id: 2, text: 'Nouveauté', slug: 'nouveaute', type: 'status', color_hint: '#3498DB', description: 'Indique un produit récemment ajouté à la boutique.' },
+    { id: 3, text: 'Meilleure Vente', slug: 'meilleure-vente', type: 'status', color_hint: '#F1C40F', description: 'Met en avant un produit populaire très vendu.' },
+    { id: 4, text: 'Livraison Gratuite', slug: 'livraison-gratuite', type: 'offer', color_hint: '#2ECC71', description: 'Produit éligible à la livraison offerte.' },
+    { id: 5, text: 'Stock Limité', slug: 'stock-limite', type: 'urgency', color_hint: '#E67E22', description: 'Crée un sentiment d\'urgence en montrant un stock faible.' },
+    { id: 6, text: 'Épuisé', slug: 'epuise', type: 'status', color_hint: '#95A5A6', description: 'L\'article est actuellement indisponible à l\'achat.' },
+    { id: 7, text: 'Déstockage', slug: 'destockage', type: 'discount', color_hint: '#C0392B', description: 'Dernière démarque, dernière chance d\'acheter.' },
+    { id: 8, text: '-50%', slug: '50-pourcent', type: 'discount', color_hint: '#E74C3C', description: 'Remise spécifique basée sur un pourcentage.' },
+    { id: 9, text: 'Vente Flash', slug: 'vente-flash', type: 'urgency', color_hint: '#9B59B6', description: 'Une promotion spéciale limitée dans le temps.' },
+    { id: 10, text: 'Mieux Noté', slug: 'mieux-note', type: 'status', color_hint: '#3498DB', description: 'Indique des avis et notes clients élevés.' },
   ],
   updatedAt: new Date().toISOString(),
 };

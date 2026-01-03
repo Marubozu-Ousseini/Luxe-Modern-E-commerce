@@ -4,14 +4,25 @@ import os from 'os';
 import bcrypt from 'bcryptjs';
 import { fileURLToPath } from 'url';
 import { query, isDbAvailable } from './db.js';
+import * as firestoreService from './firestoreService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-// Use writable directory for runtime data. Prefer DATA_DIR env var when provided
-// (useful for Cloud Run writable path like /tmp or mounted volume). Fall back to OS temp.
-const dataDir = process.env.DATA_DIR
-  ? path.resolve(process.env.DATA_DIR)
-  : path.resolve(os.tmpdir(), 'luxe-data');
+// Data directory selection:
+// - If DATA_DIR is provided, use it (Cloud Run writable path or mounted volume).
+// - If running in production (or when USE_FIRESTORE=true) default to OS temp dir to avoid
+//   writing into container image layers.
+// - Otherwise (local development) use the repository `data/` folder so created users/admins
+//   persist between runs and scripts like `reset-admin.ts` operate on the project data.
+const projectDataDir = path.resolve(process.cwd(), 'data');
+let dataDir: string;
+if (process.env.DATA_DIR) {
+  dataDir = path.resolve(process.env.DATA_DIR);
+} else if (process.env.NODE_ENV === 'production' || process.env.USE_FIRESTORE === 'true') {
+  dataDir = path.resolve(os.tmpdir(), 'luxe-data');
+} else {
+  dataDir = projectDataDir;
+}
 const usersFile = path.join(dataDir, 'users.json');
 
 type Role = 'user' | 'admin';
@@ -63,6 +74,8 @@ function readUsers(): UserRecord[] {
     return [];
   }
 }
+
+// (moved) upsertFirebaseUserAsync implemented in services/userUpsert.ts
 
 function writeUsers(users: UserRecord[]) {
   ensureDataDir();
@@ -152,6 +165,10 @@ export function addVoucherToUser(email: string, voucher: Omit<Voucher, 'createdA
 
 // === Favorites (FS only; DB path would require separate table) ===
 export function getUserFavoritesById(id: string): number[] {
+  if (process.env.USE_FIRESTORE === 'true') {
+    // Firestore variant (sync wrapper returns empty; prefer async toggle below)
+    throw new Error('Use async favorites when USE_FIRESTORE is enabled');
+  }
   if (isDbAvailable()) throw new Error('Favorites not implemented for DB mode');
   const users = readUsers();
   const u = users.find(u => u.id === id);
@@ -159,6 +176,9 @@ export function getUserFavoritesById(id: string): number[] {
 }
 
 export function toggleUserFavoriteById(id: string, productId: number): number[] {
+  if (process.env.USE_FIRESTORE === 'true') {
+    throw new Error('Use toggleUserFavoriteByIdAsync when USE_FIRESTORE is enabled');
+  }
   if (isDbAvailable()) throw new Error('Favorites not implemented for DB mode');
   const users = readUsers();
   const idx = users.findIndex(u => u.id === id);
@@ -178,18 +198,57 @@ export function getAllUsersSanitized(): Omit<UserRecord, 'passwordHash'>[] {
 
 // === Async DB-backed variants ===
 export async function findUserByEmailAsync(email: string): Promise<UserRecord | undefined> {
+  if (process.env.USE_FIRESTORE === 'true') {
+    const u = await firestoreService.findUserByEmailFs(email);
+    if (!u) return undefined;
+    return {
+      id: u.id,
+      email: u.email,
+      name: u.name || '',
+      role: (u.role as Role) || 'user',
+      passwordHash: u.passwordHash || '',
+      rewardsPoints: u.rewardsPoints,
+      vouchers: u.vouchers,
+      favorites: u.favorites,
+      cart: u.cart,
+    } as UserRecord;
+  }
   if (!isDbAvailable()) return findUserByEmail(email);
   const { rows } = await query<UserRecord>('SELECT id, email, name, role, password_hash as "passwordHash", phone, town, cart FROM users WHERE lower(email)=lower($1) LIMIT 1', [email]);
   return rows[0];
 }
 
 export async function findUserByIdAsync(id: string): Promise<UserRecord | undefined> {
+  if (process.env.USE_FIRESTORE === 'true') {
+    const u = await firestoreService.findUserByIdFs(id);
+    if (!u) return undefined;
+    return {
+      id: u.id,
+      email: u.email,
+      name: u.name || '',
+      role: (u.role as Role) || 'user',
+      passwordHash: u.passwordHash || '',
+      rewardsPoints: u.rewardsPoints,
+      vouchers: u.vouchers,
+      favorites: u.favorites,
+      cart: u.cart,
+    } as UserRecord;
+  }
   if (!isDbAvailable()) return findUserById(id);
   const { rows } = await query<UserRecord>('SELECT id, email, name, role, password_hash as "passwordHash", phone, town, cart FROM users WHERE id=$1 LIMIT 1', [id]);
   return rows[0];
 }
 
 export async function createUserAsync(name: string, email: string, password: string, role: Role = 'user', phone?: string, town?: string): Promise<UserRecord> {
+  if (process.env.USE_FIRESTORE === 'true') {
+    const existing = await firestoreService.findUserByEmailFs(email);
+    if (existing) throw new Error('Email déjà utilisé');
+    const id = String(Date.now());
+    const passwordHash = bcrypt.hashSync(password, 10);
+    const user = { id, email: email.toLowerCase(), name, role, passwordHash, phone, town } as any;
+    await firestoreService.createUserFs(user);
+    return user as UserRecord;
+  }
   if (!isDbAvailable()) return createUser(name, email, password, role, phone, town);
   const existing = await findUserByEmailAsync(email);
   if (existing) throw new Error('Email déjà utilisé');
@@ -200,18 +259,36 @@ export async function createUserAsync(name: string, email: string, password: str
 }
 
 export async function createUserIfNotExistsAsync(name: string, email: string, password: string, role: Role = 'user'): Promise<UserRecord> {
+  if (process.env.USE_FIRESTORE === 'true') {
+    const existing = await firestoreService.findUserByEmailFs(email);
+    if (existing) return (existing as any) as UserRecord;
+    return createUserAsync(name, email, password, role);
+  }
   const existing = await findUserByEmailAsync(email);
   if (existing) return existing;
   return createUserAsync(name, email, password, role);
 }
 
 export async function setUserRoleAsync(email: string, role: Role): Promise<UserRecord | undefined> {
+
+  if (process.env.USE_FIRESTORE === 'true') {
+    const u = await firestoreService.findUserByEmailFs(email);
+    if (!u) return undefined;
+    await firestoreService.setUserRoleFs(email, role);
+    const updated = await firestoreService.findUserByEmailFs(email);
+    return (updated as any) as UserRecord;
+  }
   if (!isDbAvailable()) return setUserRole(email, role);
   const { rows } = await query<UserRecord>('UPDATE users SET role=$2 WHERE lower(email)=lower($1) RETURNING id, email, name, role, password_hash as "passwordHash"', [email, role]);
   return rows[0];
 }
 
 export async function setUserPasswordAsync(email: string, newPassword: string): Promise<UserRecord | undefined> {
+  if (process.env.USE_FIRESTORE === 'true') {
+    const hash = bcrypt.hashSync(newPassword, 10);
+    const updated = await firestoreService.setUserPasswordFs(email, hash);
+    return (updated as any) as UserRecord;
+  }
   if (!isDbAvailable()) return setUserPassword(email, newPassword);
   const hash = bcrypt.hashSync(newPassword, 10);
   const { rows } = await query<UserRecord>('UPDATE users SET password_hash=$2 WHERE lower(email)=lower($1) RETURNING id, email, name, role, password_hash as "passwordHash"', [email, hash]);
@@ -219,6 +296,9 @@ export async function setUserPasswordAsync(email: string, newPassword: string): 
 }
 
 export async function getAllUsersSanitizedAsync(): Promise<Omit<UserRecord, 'passwordHash'>[]> {
+  if (process.env.USE_FIRESTORE === 'true') {
+    return firestoreService.getAllUsersSanitizedFs();
+  }
   if (!isDbAvailable()) return getAllUsersSanitized();
   const { rows } = await query<UserRecord>('SELECT id, email, name, role, password_hash as "passwordHash", phone, town FROM users ORDER BY created_at DESC');
   return rows.map(({ passwordHash, ...rest }) => rest);
@@ -242,16 +322,33 @@ export function setCartByUserIdSync(id: string, cart: any[]): void {
 }
 
 export async function getCartByUserId(id: string): Promise<any[]> {
+  if (process.env.USE_FIRESTORE === 'true') {
+    return firestoreService.getCartByUserIdFs(id);
+  }
   if (!isDbAvailable()) return getCartByUserIdSync(id);
   const { rows } = await query<{ cart: any[] }>('SELECT cart FROM users WHERE id=$1 LIMIT 1', [id]);
   return rows[0]?.cart || [];
 }
 
 export async function setCartByUserId(id: string, cart: any[]): Promise<void> {
+  if (process.env.USE_FIRESTORE === 'true') {
+    return firestoreService.setCartByUserIdFs(id, cart);
+  }
   if (!isDbAvailable()) return setCartByUserIdSync(id, cart);
   // Ensure we pass a JSON value for the JSONB column. Passing a raw JS array can be
   // interpreted as a Postgres array by the driver; stringify to guarantee valid JSON input.
   await query('UPDATE users SET cart=$1 WHERE id=$2', [JSON.stringify(cart || []), id]);
+}
+
+// Async favorites for Firestore mode
+export async function getUserFavoritesByIdAsync(id: string): Promise<number[]> {
+  if (process.env.USE_FIRESTORE === 'true') return firestoreService.getUserFavoritesByIdFs(id);
+  return getUserFavoritesById(id);
+}
+
+export async function toggleUserFavoriteByIdAsync(id: string, productId: number): Promise<number[]> {
+  if (process.env.USE_FIRESTORE === 'true') return firestoreService.toggleUserFavoriteByIdFs(id, productId);
+  return toggleUserFavoriteById(id, productId);
 }
 
 export async function mergeCartByUserId(id: string, clientCart: any[]): Promise<any[]> {

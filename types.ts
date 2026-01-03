@@ -16,6 +16,8 @@ export interface Product {
     rate: number;
     count: number;
   };
+  /** Optional label slugs applied to the product (managed via Admin). */
+  labels?: string[];
 }
 
 export interface CartItem {

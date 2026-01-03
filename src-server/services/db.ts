@@ -53,7 +53,9 @@ export async function initDb(): Promise<void> {
 export function isDbAvailable(): boolean {
   // DB considered available only after successful connectivity init
   if (process.env.NODE_ENV === 'test') return false;
-  return !!databaseUrl && connected;
+  // Consider DB available whenever a connection has been established,
+  // whether via DATABASE_URL or IAM connector options.
+  return connected;
 }
 
 export async function closeDb(): Promise<void> {

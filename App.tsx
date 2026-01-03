@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import './src/animations.css';
-import PromotionBanner from './components/PromotionBanner.tsx';
 import { usePromotions } from './context/PromotionsContext.tsx';
 import { Product, CartItem } from './types.ts';
 import { getProducts } from './services/productService.ts';
@@ -9,6 +9,8 @@ import ProductList from './components/ProductList.tsx';
 import CategoryFilter from './components/CategoryFilter.tsx';
 import Cart from './components/Cart.tsx';
 import ProductDetail from './components/ProductDetail.tsx';
+import PromoRibbon from './components/PromoRibbon.tsx';
+import AdBanner from './components/AdBanner.tsx';
 
 const App: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
@@ -65,12 +67,8 @@ const App: React.FC = () => {
   }, []);
 
   const categories = useMemo(() => {
-    const allCategories = products.map(p => p.category);
-    const base = Array.from(new Set(allCategories));
-    // Ensure "Cosmétiques" is always visible as a curated category label
-    if (!base.includes('Cosmétiques')) base.push('Cosmétiques');
-    return ['Tous', ...base];
-  }, [products]);
+    return ['Tous', 'Prêt-à-porter', 'Chaussures', 'Parfums', 'Montres', 'Accessoires'];
+  }, []);
 
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -165,8 +163,7 @@ const App: React.FC = () => {
   }
 
   return (
-  <div className="min-h-screen bg-beige font-sans text-charcoal">
-      <PromotionBanner />
+  <div className="min-h-screen bg-porcelain font-sans text-charcoal">
       <Header
         onCartClick={() => setIsCartOpen(true)}
         cartItemCount={totalCartItems}
@@ -201,25 +198,27 @@ const App: React.FC = () => {
                   />
                 )}
                 <div className="relative z-10 h-full flex flex-col items-center justify-center text-center px-6">
-                  <h1 className="text-4xl md:text-5xl font-serif font-semibold tracking-tight text-white">L'Édition Saisonnière</h1>
+                  <h1 className="text-4xl md:text-5xl font-serif font-semibold tracking-tight text-white">La qualité et le Luxe à votre portée</h1>
                   {/* Subtitle removed per request */}
                   <div className="mt-8 flex gap-4">
                     <a
                       href="#catalogue"
                       className="btn-primary font-medium px-5 py-3"
-                      aria-label="Explorer le catalogue"
-                    >Explorer</a>
-                    <a
-                      href="/story"
+                      aria-label="Explorer la collection"
+                    >Explorer la Collection</a>
+                    <Link
+                      to="/story"
                       className="btn-secondary font-medium px-5 py-3 backdrop-blur-sm"
-                      aria-label="En savoir plus sur notre histoire"
+                      aria-label="Entrer dans l'Atelier"
                     >
-                      En savoir plus
-                    </a>
+                      Entrer dans l’Atelier
+                    </Link>
                   </div>
                 </div>
               </div>
             </section>
+            <PromoRibbon />
+            <AdBanner />
             <CategoryFilter
               categories={categories}
               selectedCategory={selectedCategory}
@@ -229,57 +228,57 @@ const App: React.FC = () => {
             {/* Secondary feature links below categories */}
             <section className="mt-6 mb-8">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <a href="/showroom" className="group relative overflow-hidden rounded-lg bg-white shadow-soft border border-sky-200 px-6 py-5 flex items-center justify-between hover:border-sky-300">
-                  <h3 className="text-2xl md:text-3xl font-serif text-charcoal group-hover:text-blue-900 transition-colors">Showroom</h3>
-                  <span className="text-sm text-blue-900/80 group-hover:text-blue-900 transition-colors bg-sky-100 px-3 py-1 rounded-md">Découvrir</span>
-                </a>
-                <a href="/galeries" className="group relative overflow-hidden rounded-lg bg-white shadow-soft border border-sky-200 px-6 py-5 flex items-center justify-between hover:border-sky-300">
-                  <h3 className="text-2xl md:text-3xl font-serif text-charcoal group-hover:text-blue-900 transition-colors">Galeries</h3>
-                  <span className="text-sm text-blue-900/80 group-hover:text-blue-900 transition-colors bg-sky-100 px-3 py-1 rounded-md">Explorer</span>
-                </a>
+                <Link to="/showroom" className="group relative overflow-hidden rounded-lg bg-white shadow-soft border border-sand px-6 py-5 flex items-center justify-between hover:border-taupe/40">
+                  <h3 className="text-2xl md:text-3xl font-serif text-charcoal group-hover:text-slate transition-colors">Showroom</h3>
+                  <span className="text-sm text-charcoal/80 group-hover:text-charcoal transition-colors bg-bone px-3 py-1 rounded-md">Découvrir</span>
+                </Link>
+                <Link to="/galeries" className="group relative overflow-hidden rounded-lg bg-white shadow-soft border border-sand px-6 py-5 flex items-center justify-between hover:border-taupe/40">
+                  <h3 className="text-2xl md:text-3xl font-serif text-charcoal group-hover:text-slate transition-colors">Galeries</h3>
+                  <span className="text-sm text-charcoal/80 group-hover:text-charcoal transition-colors bg-bone px-3 py-1 rounded-md">Explorer</span>
+                </Link>
               </div>
             </section>
             <div id="catalogue">{renderContent()}</div>
           </>
         )}
       </main>
-      <footer className="bg-header mt-12">
-        <div className="container mx-auto max-w-content px-4 sm:px-6 lg:px-8 py-12">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-sm text-white">
+      <footer className="bg-sand mt-12">
+        <div className="container mx-auto max-w-content px-4 sm:px-6 lg:px-8 py-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm text-charcoal">
             <div>
-              <h4 className="font-semibold mb-3">Boutique</h4>
-              <ul className="space-y-2 text-white/80">
-                <li><a className="hover:text-white" href="#">Nouveautés</a></li>
-                <li><a className="hover:text-white" href="#">Essentiels</a></li>
-                <li><a className="hover:text-white" href="#">Éditions</a></li>
+              <h4 className="font-semibold mb-2">Boutique</h4>
+              <ul className="space-y-2 text-charcoal/80">
+                <li><a className="hover:text-charcoal" href="#">Nouveautés</a></li>
               </ul>
             </div>
             <div>
-              <h4 className="font-semibold mb-3">Histoire</h4>
-              <ul className="space-y-2 text-white/80">
-                <li><a className="hover:text-white" href="#">Notre vision</a></li>
-                <li><a className="hover:text-white" href="#">Atelier</a></li>
-                <li><a className="hover:text-white" href="#">Matières</a></li>
+              <h4 className="font-semibold mb-2">Histoire</h4>
+              <ul className="space-y-2 text-charcoal/80">
+                <li><a className="hover:text-charcoal" href="#">Notre vision</a></li>
               </ul>
             </div>
             <div>
-              <h4 className="font-semibold mb-3">Service Client</h4>
-              <ul className="space-y-2 text-white/80">
-                <li><a className="hover:text-white" href="#">Livraison & Retours</a></li>
-                <li><a className="hover:text-white" href="#">Contact</a></li>
-                <li><a className="hover:text-white" href="#">FAQ</a></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-3">Journal</h4>
-              <p className="text-white/80 mb-3">Rejoindre le Cercle</p>
-              <form className="flex items-center gap-2">
-                <input type="email" placeholder="Votre email" className="flex-1 bg-white/10 text-white rounded-md px-3 py-2 text-sm placeholder-white/70 focus:bg-white/20 focus:border-white/40 focus:ring-1 focus:ring-white/40 border border-white/10" />
-                <button type="button" className="btn-primary px-4 py-2">S'inscrire</button>
-              </form>
+              <h4 className="font-semibold mb-2">Réseaux sociaux</h4>
+              <div className="flex items-center gap-3">
+                <a href="https://instagram.com" aria-label="Instagram" className="p-2 rounded bg-white/70 hover:bg-white shadow-soft hover:shadow-lg transition">
+                  <img src="/icons/instagram.svg" alt="Instagram" className="h-5 w-5" />
+                </a>
+                <a href="https://tiktok.com" aria-label="TikTok" className="p-2 rounded bg-white/70 hover:bg-white shadow-soft hover:shadow-lg transition">
+                  <img src="/icons/tiktok.svg" alt="TikTok" className="h-5 w-5" />
+                </a>
+                <a href="https://facebook.com" aria-label="Facebook" className="p-2 rounded bg-white/70 hover:bg-white shadow-soft hover:shadow-lg transition">
+                  <img src="/icons/facebook.svg" alt="Facebook" className="h-5 w-5" />
+                </a>
+                <a href="https://wa.me/" aria-label="WhatsApp" className="p-2 rounded bg-white/70 hover:bg-white shadow-soft hover:shadow-lg transition">
+                  <img src="/icons/whatsapp.svg" alt="WhatsApp" className="h-5 w-5" />
+                </a>
+                <a href="https://snapchat.com" aria-label="Snapchat" className="p-2 rounded bg-white/70 hover:bg-white shadow-soft hover:shadow-lg transition">
+                  <img src="/icons/snapchat.svg" alt="Snapchat" className="h-5 w-5" />
+                </a>
+              </div>
             </div>
           </div>
-          <div className="mt-10 text-center text-white/70">
+          <div className="mt-8 text-center text-charcoal/70">
             <p>&copy; {new Date().getFullYear()} Marubozu Sensei. Tous droits réservés.</p>
           </div>
         </div>

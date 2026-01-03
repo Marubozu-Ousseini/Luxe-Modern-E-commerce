@@ -16,7 +16,7 @@ interface AuthContextShape {
   loading: boolean;
   initializing: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
+  register: (name: string, email: string, password: string, phone?: string, town?: string) => Promise<void>;
   loginWithGoogle?: () => Promise<any>;
   logout: () => Promise<void>;
 }
@@ -80,6 +80,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // Optionally notify backend about login or sync user
           if (token) {
             try { await AuthAPI.setIdToken(token); } catch (e) { /* ignore */ }
+            // Persist the Firebase user into the DB for consistency
+            try { await AuthAPI.syncUser(u.name); } catch (_) { /* ignore */ }
           }
         });
         if (typeof maybeUnsub === 'function') unsub = maybeUnsub;
@@ -93,20 +95,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password: string) => {
     setLoading(true);
     try {
-      // Prefer Firebase login if configured
-      try {
-        const fbUser = await fbLoginWithEmail(email, password);
-        const token = await getCurrentIdToken();
-        const role = fbUser?.admin ? 'admin' : 'user';
-        const u = { id: fbUser.uid, email: fbUser.email || '', name: fbUser.displayName || undefined, role };
-        setUser(u);
-        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(u)); } catch (_) { /* ignore */ }
-        if (token) await AuthAPI.setIdToken(token);
-        return;
-      } catch (_) {
-        const data = await AuthAPI.login(email, password);
-        setUser(data);
-        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch (_) { /* ignore */ }
+      // Firebase-only authentication (no server fallback)
+      const fbUser = await fbLoginWithEmail(email, password);
+      const token = await getCurrentIdToken();
+      const role = fbUser?.admin ? 'admin' : 'user';
+      const u = { id: fbUser.uid, email: fbUser.email || '', name: fbUser.displayName || undefined, role };
+      setUser(u);
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(u)); } catch (_) { /* ignore */ }
+      if (token) {
+        await AuthAPI.setIdToken(token);
+        // Persist the Firebase user into the DB for consistency
+        try { await AuthAPI.syncUser(u.name); } catch (_) { /* ignore */ }
       }
     } finally {
       setLoading(false);
@@ -126,7 +125,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Log Google account sign-in for debugging/observability
         // eslint-disable-next-line no-console
         console.info('[auth] Google sign-in:', { uid: fbUser.uid, email: fbUser.email, name: fbUser.displayName });
-        if (token) await AuthAPI.setIdToken(token);
+        if (token) {
+          await AuthAPI.setIdToken(token);
+          // Persist the Firebase user into the DB for consistency
+          try { await AuthAPI.syncUser(u.name); } catch (_) { /* ignore */ }
+        }
         return fbUser;
       } catch (_) {
         // If firebase not configured, there's no fallback via AuthAPI for Google popup
@@ -137,21 +140,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const register = async (name: string, email: string, password: string) => {
+  const register = async (name: string, email: string, password: string, _phone?: string, _town?: string) => {
     setLoading(true);
     try {
-      try {
-        const fbUser = await fbRegisterWithEmail(email, password);
-        const token = await getCurrentIdToken();
-        const u = { id: fbUser.uid, email: fbUser.email || '', name, role: 'user' };
-        setUser(u);
-        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(u)); } catch (_) { /* ignore */ }
-        if (token) await AuthAPI.setIdToken(token);
-        return;
-      } catch (_) {
-        const data = await AuthAPI.register(name, email, password);
-        setUser(data);
-        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch (_) { /* ignore */ }
+      // Firebase-only registration (no server fallback)
+      const fbUser = await fbRegisterWithEmail(email, password);
+      const token = await getCurrentIdToken();
+      const u = { id: fbUser.uid, email: fbUser.email || '', name, role: 'user' };
+      setUser(u);
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(u)); } catch (_) { /* ignore */ }
+      if (token) {
+        await AuthAPI.setIdToken(token);
+        // Persist the Firebase user into the DB for consistency
+        try { await AuthAPI.syncUser(u.name); } catch (_) { /* ignore */ }
       }
     } finally {
       setLoading(false);

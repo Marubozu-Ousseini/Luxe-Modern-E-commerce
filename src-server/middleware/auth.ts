@@ -8,13 +8,14 @@ const isProd = process.env.NODE_ENV === 'production';
 const COOKIE_DOMAIN = process.env.COOKIE_DOMAIN || undefined; // e.g. .malafaareh.com
 
 export function cookieOptions() {
+  // For cross-site requests (frontend on Firebase Hosting or a different subdomain),
+  // cookies must use SameSite=None and Secure=true to be included in XHR/fetch.
+  const sameSite: 'lax' | 'strict' | 'none' = isProd ? 'none' : 'lax';
   return {
     httpOnly: true,
-    sameSite: 'lax' as 'lax' | 'strict' | 'none',
-    secure: !!isProd,
+    sameSite,
+    secure: true,
     domain: COOKIE_DOMAIN,
-    // Allow frontend and backend on same apex to share cookies
-    // path defaults to '/'
   };
 }
 
@@ -34,15 +35,20 @@ declare global {
 
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
   try {
+    // Prefer Firebase ID token forwarded by Cloud Functions proxy
+    const forwarded = (req.headers['x-firebase-id-token'] || '') as string;
+    const forwardedBearer = typeof forwarded === 'string' && forwarded ? forwarded : null;
+
     // If an Authorization: Bearer <id_token> header is present, try Firebase verification first
     const authHeader = (req.headers.authorization || '') as string;
     const bearer = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-    if (bearer) {
+    const candidateToken = forwardedBearer || bearer;
+    if (candidateToken) {
       try {
         initFirebaseAdmin();
         const admin = getFirebaseAdmin();
         if (admin && admin.auth) {
-          return admin.auth().verifyIdToken(bearer)
+          return admin.auth().verifyIdToken(candidateToken)
             .then((decoded: any) => {
               // Map Firebase token to our AuthUser shape. We prefer role from custom claims.
               const role = decoded?.admin || decoded?.role ? (decoded.admin ? 'admin' : (decoded.role || 'user')) : 'user';

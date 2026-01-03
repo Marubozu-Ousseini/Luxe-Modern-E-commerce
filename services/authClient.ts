@@ -39,4 +39,21 @@ export async function logout() {
   await fetch(apiUrl('/api/auth/logout'), withAuthHeaders({ method: 'POST' }));
 }
 
+export async function me() {
+  const res = await fetch(apiUrl('/api/auth/me'), { credentials: 'include' });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function syncUser(name?: string) {
+  const init: RequestInit = withAuthHeaders({
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name })
+  });
+  const res = await fetch(apiUrl('/api/auth/sync'), init);
+  if (!res.ok) throw new Error('Synchronisation utilisateur échouée');
+  return res.json();
+}
+
 export default { setIdToken };

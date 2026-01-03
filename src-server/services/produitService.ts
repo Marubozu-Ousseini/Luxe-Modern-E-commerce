@@ -13,7 +13,8 @@ const products: Product[] = [
     description: "Fabriquée en acajou, cette guitare acoustique offre des tons chauds et résonnants, parfaits pour les mélodies soul et les performances intimes.",
   category: 'Montres',
     imageUrl: 'https://picsum.photos/seed/guitar/600/600',
-    rating: { rate: 4.7, count: 130 }
+      rating: { rate: 4.7, count: 130 },
+      labels: ['mieux-note']
   },
   {
     id: 2,
@@ -24,35 +25,39 @@ const products: Product[] = [
   category: 'Chaussures',
     imageUrl: 'https://picsum.photos/seed/camera/600/600',
     limitedAvailability: true,
-    rating: { rate: 4.8, count: 250 }
+    rating: { rate: 4.8, count: 250 },
+    labels: ['meilleure-vente']
   },
   {
     id: 3,
   name: 'Veste Minimaliste en Cuir',
     price: 125000,
     description: "Élégante et sobre, cette montre dispose d'un bracelet en cuir véritable et d'un cadran épuré. Un accessoire sophistiqué pour toute occasion.",
-  category: 'Prêt-à-Porter',
+  category: 'Prêt-à-porter',
     imageUrl: 'https://picsum.photos/seed/watch/600/600',
-    rating: { rate: 4.5, count: 420 }
+    rating: { rate: 4.5, count: 420 },
+    labels: []
   },
   {
     id: 4,
   name: 'Chemise Pour-Over en Coton',
     price: 55000,
     description: "Élevez votre rituel café avec ce set pour-over en céramique. Comprend un dripper et une carafe pour une infusion parfaite et artisanale.",
-  category: 'Prêt-à-Porter',
+  category: 'Prêt-à-porter',
     imageUrl: 'https://picsum.photos/seed/coffee/600/600',
-    rating: { rate: 4.9, count: 310 }
+    rating: { rate: 4.9, count: 310 },
+    labels: ['nouveaute']
   },
   {
     id: 5,
   name: "Sac à Dos Urbain en Toile",
     price: 78000,
     description: "Durable et stylé, ce sac à dos en toile est prêt pour l'aventure. Avec de multiples compartiments, il est parfait pour la ville ou les escapades.",
-  category: 'Prêt-à-Porter',
+  category: 'Accessoires',
     imageUrl: 'https://picsum.photos/seed/backpack/600/600',
     limitedAvailability: true,
-    rating: { rate: 4.6, count: 550 }
+    rating: { rate: 4.6, count: 550 },
+    labels: []
   },
   {
     id: 6,
@@ -62,7 +67,8 @@ const products: Product[] = [
     description: "Vivez un son immersif haute-fidélité avec ces enceintes compactes. Finition bois élégante et drivers audio puissants.",
   category: 'Chaussures',
     imageUrl: 'https://picsum.photos/seed/speakers/600/600',
-    rating: { rate: 4.8, count: 180 }
+    rating: { rate: 4.8, count: 180 },
+    labels: []
   },
   {
     id: 9,
@@ -72,44 +78,91 @@ const products: Product[] = [
     description: "Plongez dans un son pur avec ce casque circum-aural premium. Réduction de bruit active, coussinets moelleux et 30 heures d'autonomie.",
   category: 'Montres',
     imageUrl: 'https://picsum.photos/seed/headphones/600/600',
-    rating: { rate: 4.9, count: 850 }
+    rating: { rate: 4.9, count: 850 },
+    labels: []
   },
   {
     id: 12,
   name: 'Pantalon Intérieur Intelligent',
     price: 140000,
     description: "Cultivez des herbes fraîches toute l'année. Arrosage automatisé et lumières de croissance LED pour un jardinage facile.",
-  category: 'Prêt-à-Porter',
+  category: 'Prêt-à-porter',
     imageUrl: 'https://picsum.photos/seed/garden/600/600',
     limitedAvailability: true,
-    rating: { rate: 4.7, count: 220 }
+    rating: { rate: 4.7, count: 220 },
+    labels: []
   },
   {
     id: 13,
     name: 'Parfum Ambre Nocturne',
     price: 95000,
     description: 'Eau de parfum chaude et enveloppante, mêlant ambre, vanille et notes boisées pour les soirées élégantes.',
-    category: 'Cosmétiques',
+    category: 'Parfums',
     imageUrl: 'https://images.pexels.com/photos/965989/pexels-photo-965989.jpeg?auto=compress&cs=tinysrgb&w=800',
     rating: { rate: 4.8, count: 180 },
+    labels: []
   },
   {
     id: 14,
     name: 'Brume Parfumée Coton Doux',
     price: 45000,
     description: 'Body mist léger aux notes de coton frais et musc blanc, parfait pour un sillage discret au quotidien.',
-    category: 'Cosmétiques',
+    category: 'Parfums',
     imageUrl: 'https://images.pexels.com/photos/3735613/pexels-photo-3735613.jpeg?auto=compress&cs=tinysrgb&w=800',
     rating: { rate: 4.6, count: 95 },
+    labels: []
   },
   {
     id: 15,
     name: 'Coffret Découverte Brumes',
     price: 78000,
     description: 'Set de trois brumes parfumées (fleur d’oranger, thé blanc, figue) pour varier les ambiances selon vos envies.',
-    category: 'Cosmétiques',
+    category: 'Parfums',
     imageUrl: 'https://images.pexels.com/photos/4202922/pexels-photo-4202922.jpeg?auto=compress&cs=tinysrgb&w=800',
     rating: { rate: 4.7, count: 120 },
+    labels: []
+  },
+  {
+    id: 16,
+    name: 'Montre Automatique Sable',
+    price: 289000,
+    originalPrice: 320000,
+    description: "Montre automatique au cadran sable et index sobres, bracelet cuir pleine fleur. Élégance intemporelle au poignet.",
+    category: 'Montres',
+    imageUrl: 'https://picsum.photos/seed/watchauto/600/600',
+    rating: { rate: 4.8, count: 210 },
+    labels: []
+  },
+  {
+    id: 17,
+    name: 'Sneakers Minimalistes en Nubuck',
+    price: 110000,
+    originalPrice: 129000,
+    description: "Silhouette épurée, empeigne en nubuck souple et semelle ton-sur-ton pour un confort discret et moderne.",
+    category: 'Chaussures',
+    imageUrl: 'https://picsum.photos/seed/sneaker/600/600',
+    rating: { rate: 4.6, count: 340 },
+    labels: []
+  },
+  {
+    id: 18,
+    name: 'Ceinture en Cuir Grainé',
+    price: 45000,
+    description: "Cuir grainé italien, boucle finition brossée. L’allié discret pour structurer vos silhouettes.",
+    category: 'Accessoires',
+    imageUrl: 'https://picsum.photos/seed/belt/600/600',
+    rating: { rate: 4.5, count: 95 },
+    labels: []
+  },
+  {
+    id: 19,
+    name: 'Lunettes de Soleil Acétate',
+    price: 69000,
+    description: "Monture en acétate premium, verres UV400 teinte thé. Ligne douce et raffinée.",
+    category: 'Accessoires',
+    imageUrl: 'https://picsum.photos/seed/sunglasses/600/600',
+    rating: { rate: 4.7, count: 140 },
+    labels: []
   },
 ];
 
@@ -125,7 +178,7 @@ export function getAllProducts(): Product[] {
 
 export async function getAllProductsAsync(): Promise<Product[]> {
   if (!isDbAvailable()) return getAllProducts();
-  const { rows } = await query<any>('SELECT id, name, price, original_price as "originalPrice", description, category, image_url as "imageUrl", stock, limited_availability as "limitedAvailability", rating_rate as "ratingRate", rating_count as "ratingCount" FROM products ORDER BY id ASC');
+  const { rows } = await query<any>('SELECT id, name, price, original_price as "originalPrice", description, category, image_url as "imageUrl", stock, limited_availability as "limitedAvailability", rating_rate as "ratingRate", rating_count as "ratingCount", labels FROM products ORDER BY id ASC');
   return rows.map(r => ({
     id: r.id,
     name: r.name,
@@ -136,7 +189,8 @@ export async function getAllProductsAsync(): Promise<Product[]> {
     imageUrl: r.imageUrl,
     stock: r.stock ?? 0,
     limitedAvailability: r.limitedAvailability || undefined,
-    rating: { rate: Number(r.ratingRate || 0), count: Number(r.ratingCount || 0) }
+    rating: { rate: Number(r.ratingRate || 0), count: Number(r.ratingCount || 0) },
+    labels: Array.isArray(r.labels) ? r.labels : (r.labels ? JSON.parse(r.labels) : undefined)
   }));
 }
 
@@ -163,7 +217,7 @@ export async function getProductsAsync(opts?: { q?: string; limit?: number; offs
     i++;
   }
   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
-  let sql = `SELECT id, name, price, original_price as "originalPrice", description, category, image_url as "imageUrl", stock, limited_availability as "limitedAvailability", rating_rate as "ratingRate", rating_count as "ratingCount" FROM products ${where} ORDER BY id ASC`; 
+  let sql = `SELECT id, name, price, original_price as "originalPrice", description, category, image_url as "imageUrl", stock, limited_availability as "limitedAvailability", rating_rate as "ratingRate", rating_count as "ratingCount", labels FROM products ${where} ORDER BY id ASC`; 
   if (opts?.limit) { sql += ` LIMIT $${i++}`; values.push(opts.limit); }
   if (opts?.offset) { sql += ` OFFSET $${i++}`; values.push(opts.offset); }
   const { rows } = await query<any>(sql, values);
@@ -177,7 +231,8 @@ export async function getProductsAsync(opts?: { q?: string; limit?: number; offs
     imageUrl: r.imageUrl,
     stock: r.stock ?? 0,
     limitedAvailability: r.limitedAvailability || undefined,
-    rating: { rate: Number(r.ratingRate || 0), count: Number(r.ratingCount || 0) }
+    rating: { rate: Number(r.ratingRate || 0), count: Number(r.ratingCount || 0) },
+    labels: Array.isArray(r.labels) ? r.labels : (r.labels ? JSON.parse(r.labels) : undefined)
   }));
 }
 
@@ -190,7 +245,7 @@ export function addProduct(newProduct: Omit<Product, 'id' | 'rating'> & { rating
 
 export async function addProductAsync(newProduct: Omit<Product, 'id' | 'rating'> & { rating?: Product['rating'] }): Promise<Product> {
   if (!isDbAvailable()) return addProduct(newProduct);
-  const result = await query<any>('INSERT INTO products (name, price, original_price, description, category, image_url, stock, limited_availability, rating_rate, rating_count) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id', [
+  const result = await query<any>('INSERT INTO products (name, price, original_price, description, category, image_url, stock, limited_availability, rating_rate, rating_count, labels) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id', [
     newProduct.name,
     newProduct.price,
     newProduct.originalPrice ?? null,
@@ -201,6 +256,7 @@ export async function addProductAsync(newProduct: Omit<Product, 'id' | 'rating'>
     newProduct.limitedAvailability ?? false,
     newProduct.rating?.rate ?? 0,
     newProduct.rating?.count ?? 0,
+    JSON.stringify(newProduct.labels ?? [])
   ]);
   const id = result.rows[0].id;
   return { id, rating: newProduct.rating || { rate: 0, count: 0 }, ...newProduct };
@@ -228,6 +284,7 @@ export async function updateProductAsync(id: number, updates: Partial<Omit<Produ
     image_url: updates.imageUrl,
     stock: updates.stock,
     limited_availability: updates.limitedAvailability,
+    labels: updates.labels ? JSON.stringify(updates.labels) : undefined,
   };
   for (const [col, val] of Object.entries(map)) {
     if (val !== undefined) { fields.push(`${col}=$${i++}`); values.push(val); }

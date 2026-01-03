@@ -18,10 +18,11 @@ router.post('/', async (req, res) => {
   try {
     const userId = req.user!.id;
     const items = req.body?.items as { productId: number; quantity: number }[];
-      const paymentMethod = req.body?.paymentMethod as 'orange_money' | 'mtn_mobile_money' | 'on_delivery' | undefined;
+    const paymentMethod = req.body?.paymentMethod as 'orange_money' | 'mtn_mobile_money' | 'on_delivery' | undefined;
+    const couponCode = String(req.body?.couponCode || '').trim().toUpperCase() || undefined;
     if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ message: 'Panier vide' });
     const products = isDbAvailable() ? await getAllProductsAsync() : getAllProducts();
-      const order = isDbAvailable() ? await createOrderAsync(userId, products, items, paymentMethod) : createOrder(userId, products, items, paymentMethod);
+      const order = isDbAvailable() ? await createOrderAsync(userId, products, items, paymentMethod, couponCode) : createOrder(userId, products, items, paymentMethod, couponCode);
     return res.status(201).json(order);
   } catch (e: any) {
     return res.status(400).json({ message: e?.message || 'Commande échouée' });

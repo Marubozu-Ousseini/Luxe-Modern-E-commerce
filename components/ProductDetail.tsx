@@ -72,11 +72,13 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product, onAddToCart, onB
 
           <div className="mt-6">
             {product.originalPrice && product.originalPrice > product.price && (
-              <span className="block text-base line-through text-slate-400">{formatCurrency(product.originalPrice)}</span>
+              <span className="block text-base line-through text-red-600">{formatCurrency(product.originalPrice)}</span>
             )}
-            <p className="text-3xl font-semibold text-gold">{formatCurrency(product.price)}</p>
+            <p className="text-3xl font-semibold text-charcoal">{formatCurrency(product.price)}</p>
             {product.originalPrice && product.originalPrice > product.price && (
-              <span className="mt-2 inline-block text-xs px-2 py-1 rounded-full bg-gold/15 text-gold font-medium tracking-wide">Prix spécial</span>
+              <span className="mt-2 inline-block text-xs px-2 py-1 rounded-full bg-green-100 text-green-700 shimmer">
+                Vous gagnez {formatCurrency(product.originalPrice - product.price)}
+              </span>
             )}
           </div>
 

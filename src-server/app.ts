@@ -16,6 +16,8 @@ import adminRoutes from './api/admin.js';
 import paymentsRoutes, { stripeWebhookRouter } from './api/payments.js';
 import promotionsRoutes from './api/promotions.js';
 import cartRoutes from './api/cart.js';
+import favoritesRoutes from './api/favorites.js';
+import proxyRoutes from './api/proxy.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -50,6 +52,11 @@ app.use(cors({
       return callback(null, true);
     }
 
+    // Allow Firebase Hosting preview/custom domains
+    if (origin.endsWith('.web.app') || origin.endsWith('.firebaseapp.com')) {
+      return callback(null, true);
+    }
+
     // Allow our custom domain (and any subdomains) to access the API once
     // it has been mapped to Cloud Run. This covers requests from
     // https://malafaareh.com and https://www.malafaareh.com without requiring
@@ -63,19 +70,25 @@ app.use(cors({
   credentials: true
 }));
 app.use(compression());
-// Configure Helmet with a CSP that allows the Tailwind CDN and the inline Tailwind config
-// The inline Tailwind config is used in index.html (tailwind.config) and needs 'unsafe-inline'
-// This is a pragmatic, short-term fix to unblock the deployed site. For production hardening
-// we should precompile Tailwind and remove inline scripts or use nonces.
+// Configure Helmet with a CSP suitable for compiled Tailwind (no CDN)
+// We precompile Tailwind via PostCSS, so no inline Tailwind script is needed.
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", 'https://cdn.tailwindcss.com'],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
       styleSrc: ["'self'", 'https://fonts.googleapis.com', "'unsafe-inline'"],
       fontSrc: ["'self'", 'https:', 'data:'],
       imgSrc: ["'self'", 'data:', 'https:'],
-      connectSrc: ["'self'"],
+      connectSrc: [
+        "'self'",
+        'https://identitytoolkit.googleapis.com',
+        'https://securetoken.googleapis.com',
+        'https://firestore.googleapis.com',
+        'https://firebasestorage.googleapis.com',
+        // Allow Cloud Run upstream if the UI is ever served here
+        'https://*.run.app'
+      ],
       objectSrc: ["'none'"],
       upgradeInsecureRequests: [],
     }
@@ -95,11 +108,12 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/payments', paymentsRoutes);
 app.use('/api/promotions', promotionsRoutes);
 app.use('/api/cart', cartRoutes);
+app.use('/api/favorites', favoritesRoutes);
+app.use('/proxy', proxyRoutes);
 
-// Use the project working directory to locate the built `dist` folder so static
-// file serving works correctly whether running source or compiled code.
+// Static file handler moved to the end, after all API routes
 const rootPath = path.resolve(process.cwd());
-const distPath = path.resolve(process.cwd(), 'dist');
+const distPath = path.resolve(process.cwd(), 'dist/client');
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(distPath));
   app.get('*', (_req, res) => res.sendFile(path.join(distPath, 'index.html')));

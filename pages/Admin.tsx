@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import PageBackground from '../components/PageBackground.tsx';
+import ErrorBoundary from '../components/ErrorBoundary.tsx';
 import PasswordToggle from '../components/PasswordToggle.tsx';
 import ProtectedRoute from '../components/ProtectedRoute';
 import { apiUrl } from '../services/apiClient';
@@ -37,7 +38,7 @@ interface UserRecord {
   vouchers?: { code: string; amount?: number; expiresAt?: string; createdAt: string }[];
 }
 
-type TabKey = 'products' | 'orders' | 'customers' | 'payments' | 'promos';
+type TabKey = 'products' | 'orders' | 'customers' | 'payments' | 'promos' | 'ads';
 
 // Helpers for payments monthly summary
 type PaymentRow = { id: string; userId: string; amount: number; currency: string; status: string; createdAt: string };
@@ -119,12 +120,19 @@ const AdminPage: React.FC = () => {
   const [newPassword, setNewPassword] = useState('');
   const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
 
+  const [categories, setCategories] = useState<string[]>([]);
+  const [catsLoading, setCatsLoading] = useState(false);
+  const [newCategory, setNewCategory] = useState('');
+  const [formPreview, setFormPreview] = useState<string | null>(null);
+  const [editPreview, setEditPreview] = useState<string | null>(null);
+
   const tabs: { key: TabKey; label: string }[] = useMemo(() => ([
     { key: 'products', label: 'Produits' },
     { key: 'orders', label: 'Commandes' },
     { key: 'customers', label: 'Clients' },
     { key: 'payments', label: 'Paiements' },
     { key: 'promos', label: 'Promotions' },
+    { key: 'ads', label: 'Publicités' },
   ]), []);
 
   // Data loaders
@@ -173,6 +181,40 @@ const AdminPage: React.FC = () => {
   useEffect(() => { if (tab === 'customers') fetchUsers(); }, [tab]);
   useEffect(() => { if (tab === 'payments') fetchPayments(); }, [tab]);
   useEffect(() => { if (tab === 'promos') fetchPromos(); }, [tab]);
+  useEffect(() => { if (tab === 'ads') fetchPromos(); }, [tab]);
+
+  useEffect(() => { fetchCategories(); }, []);
+
+  const fetchCategories = async () => {
+    setCatsLoading(true);
+    try {
+      const res = await fetch(apiUrl('/api/admin/categories'), { credentials: 'include' });
+      if (!res.ok) { setCategories([]); setCatsLoading(false); return; }
+      const data = await res.json();
+      setCategories(Array.isArray(data) ? data : []);
+    } catch {
+      setCategories([]);
+    } finally { setCatsLoading(false); }
+  };
+
+  // Upload helper: request signed upload URL, PUT file, return proxy URL
+  const uploadFile = async (file: File) => {
+    // Request signed upload URL from server
+    const res = await fetch(apiUrl('/api/admin/upload-url'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ filename: file.name, contentType: file.type }),
+    });
+    if (!res.ok) throw new Error('Failed to get upload URL');
+    const data = await res.json();
+    const uploadUrl: string = data.uploadUrl;
+    const proxyUrl: string = data.proxyUrl;
+    // Upload the file directly to the signed URL
+    const putRes = await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file });
+    if (!putRes.ok) throw new Error('Upload failed');
+    return proxyUrl;
+  };
 
   // Actions
   const createProduct = async (e: React.FormEvent) => {
@@ -216,6 +258,7 @@ const AdminPage: React.FC = () => {
           category: editForm.category,
           imageUrl: editForm.imageUrl,
           stock: editForm.stock ?? 0,
+          labels: (editForm as any).labels || []
         })
       });
       if (!res.ok) { setError('Mise à jour échouée'); return; }
@@ -307,8 +350,9 @@ const AdminPage: React.FC = () => {
   };
 
   return (
-    <ProtectedRoute requireAdmin>
-      <PageBackground pageKey="admin" overlayClassName="bg-black/65 backdrop-blur-sm">
+    <ErrorBoundary>
+      <ProtectedRoute requireAdmin>
+        <PageBackground pageKey="admin" overlayClassName="bg-black/65 backdrop-blur-sm">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 text-white">
         <div className="mb-6 flex items-center justify-between gap-3 flex-wrap">
           <h1 className="text-2xl font-bold">Tableau de bord Administrateur</h1>
@@ -344,8 +388,67 @@ const AdminPage: React.FC = () => {
                 <input className="w-full border rounded px-3 py-2" placeholder="Prix (XAF)" type="number" value={form.price} onChange={e=>setForm({...form, price: Number(e.target.value)})} />
                 <input className="w-full border rounded px-3 py-2" placeholder="Ancien prix (XAF, optionnel)" type="number" value={Number(form.originalPrice ?? 0)} onChange={e=>setForm({...form, originalPrice: Number(e.target.value) || undefined})} />
                 <input className="w-full border rounded px-3 py-2" placeholder="Stock" type="number" value={form.stock ?? 0} onChange={e=>setForm({...form, stock: Number(e.target.value)})} />
-                <input className="w-full border rounded px-3 py-2" placeholder="Catégorie" value={form.category} onChange={e=>setForm({...form, category: e.target.value})} />
-                <input className="w-full border rounded px-3 py-2" placeholder="Image URL" value={form.imageUrl} onChange={e=>setForm({...form, imageUrl: e.target.value})} />
+                <div>
+                  <label className="sr-only">Catégorie</label>
+                  <select className="w-full border rounded px-3 py-2" value={form.category || ''} onChange={e => {
+                    const v = e.target.value;
+                    if (v === '__new__') {
+                      setForm({ ...form, category: '__new__' });
+                    } else {
+                      setForm({ ...form, category: v });
+                      setNewCategory('');
+                    }
+                  }}>
+                    <option value="">Sélectionner une catégorie</option>
+                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                    <option value="__new__">Créer nouvelle catégorie...</option>
+                  </select>
+                  {form.category === '__new__' && (
+                    <input className="w-full border rounded px-3 py-2 mt-2" placeholder="Nouvelle catégorie" value={newCategory} onChange={e => { setNewCategory(e.target.value); setForm({ ...form, category: e.target.value }); }} />
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm mb-1">Étiquettes (labels)</label>
+                  <textarea className="w-full border rounded px-3 py-2 text-sm" placeholder="Saisir les slugs séparés par des virgules (ex: soldes,nouveaute)" value={((form as any).labels || []).join(',')} onChange={e=>setForm({ ...(form as any), labels: e.target.value.split(',').map(s=>s.trim()).filter(Boolean) }) as any} />
+                  <p className="text-xs text-slate-600 mt-1">Disponibles: {(promoState?.labels||[]).map((l:any)=>l.slug).join(', ')}</p>
+                </div>
+                <div>
+                  <input className="w-full border rounded px-3 py-2" placeholder="Image URL" value={form.imageUrl} onChange={e=>setForm({...form, imageUrl: e.target.value})} />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="w-full mt-2 text-[13px]"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      try {
+                        const preview = URL.createObjectURL(file);
+                        setFormPreview(preview);
+                        setForm({ ...form, imageUrl: 'Uploading...' });
+                        const url = await uploadFile(file);
+                        setForm({ ...form, imageUrl: url });
+                        // clear preview and revoke
+                        setFormPreview(null);
+                        URL.revokeObjectURL(preview);
+                      } catch (err) {
+                        // eslint-disable-next-line no-console
+                        console.error('upload error', err);
+                        setForm({ ...form, imageUrl: '' });
+                        alert('Échec de l\'upload');
+                      }
+                    }}
+                  />
+                  {/* Preview: immediate local preview if present, otherwise uploaded proxy URL */}
+                  {formPreview ? (
+                    <img src={formPreview} alt={form.name || 'Preview'} className="mt-2 h-24 w-full object-contain rounded" />
+                  ) : form.imageUrl ? (
+                    form.imageUrl === 'Uploading...' ? (
+                      <div className="text-sm mt-2">Uploading...</div>
+                    ) : (/^https?:\/\//i).test(form.imageUrl) ? (
+                      <img src={form.imageUrl} alt={form.name || 'Preview'} className="mt-2 h-24 w-full object-contain rounded" />
+                    ) : null
+                  ) : null}
+                </div>
                 <textarea className="w-full border rounded px-3 py-2" placeholder="Description" value={form.description} onChange={e=>setForm({...form, description: e.target.value})} />
                 <button className="btn-primary px-4 py-2 active:scale-95 transition-transform">Créer</button>
               </form>
@@ -366,18 +469,31 @@ const AdminPage: React.FC = () => {
                 <div>Chargement...</div>
               ) : (
                 <ul className="divide-y">
-                  {products.map(p => (
-                    <li key={p.id} className="py-3 flex items-center justify-between">
-                      <div>
-                        <div className="font-medium">{p.name} <span className="text-xs text-gray-500">({p.category})</span></div>
-                        <div className="text-sm text-gray-500">{p.price.toLocaleString()} XAF · Stock: {p.stock ?? 0}</div>
-                      </div>
-                      <div className="flex gap-3">
-                        <button onClick={() => startEdit(p)} className="text-blue-600 active:scale-95 transition-transform">Éditer</button>
-                        <button onClick={() => removeProduct(p.id)} className="text-red-600 active:scale-95 transition-transform">Supprimer</button>
-                      </div>
-                    </li>
-                  ))}
+                  {products.map(p => {
+                    const imgSrc = p.imageUrl ? (/^https?:\/\//i).test(p.imageUrl) ? p.imageUrl : apiUrl(p.imageUrl) : null;
+                    return (
+                      <li key={p.id} className="py-3 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          {imgSrc ? (
+                            <img src={imgSrc} alt={p.name} className="h-16 w-16 object-cover rounded" />
+                          ) : (
+                            <div className="h-16 w-16 bg-gray-100 rounded flex items-center justify-center text-xs text-gray-500">No image</div>
+                          )}
+                          <div>
+                            <div className="font-medium">{p.name} <span className="text-xs text-gray-500">({p.category})</span></div>
+                            <div className="text-sm text-gray-500">{p.price.toLocaleString()} XAF · Stock: {p.stock ?? 0}</div>
+                            {(p as any).labels && (p as any).labels.length > 0 && (
+                              <div className="mt-1 text-[11px] text-gray-500">Labels: {((p as any).labels as string[]).join(', ')}</div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex gap-3">
+                          <button onClick={() => startEdit(p)} className="text-blue-600 active:scale-95 transition-transform">Éditer</button>
+                          <button onClick={() => removeProduct(p.id)} className="text-red-600 active:scale-95 transition-transform">Supprimer</button>
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </div>
@@ -393,9 +509,72 @@ const AdminPage: React.FC = () => {
                       setEditForm({...editForm, originalPrice: v === '' ? undefined : Number(v)});
                     }} />
                     <input className="w-full border rounded px-3 py-2" type="number" value={editForm.stock ?? 0} onChange={e=>setEditForm({...editForm, stock: Number(e.target.value)})} />
-                    <input className="w-full border rounded px-3 py-2" value={editForm.category} onChange={e=>setEditForm({...editForm, category: e.target.value})} />
-                    <input className="w-full border rounded px-3 py-2" value={editForm.imageUrl} onChange={e=>setEditForm({...editForm, imageUrl: e.target.value})} />
+                    <div>
+                      <label className="sr-only">Catégorie</label>
+                      <select className="w-full border rounded px-3 py-2" value={editForm.category || ''} onChange={e => {
+                        const v = e.target.value;
+                        if (v === '__new__') {
+                          setEditForm({ ...editForm, category: '__new__' });
+                        } else {
+                          setEditForm({ ...editForm, category: v });
+                        }
+                      }}>
+                        <option value="">Sélectionner une catégorie</option>
+                        {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                        <option value="__new__">Créer nouvelle catégorie...</option>
+                      </select>
+                      {editForm.category === '__new__' && (
+                        <input className="w-full border rounded px-3 py-2 mt-2" placeholder="Nouvelle catégorie" value={newCategory} onChange={e => { setNewCategory(e.target.value); setEditForm({ ...editForm, category: e.target.value }); }} />
+                      )}
+                    </div>
+                    <div>
+                      <input className="w-full border rounded px-3 py-2" value={editForm.imageUrl} onChange={e=>setEditForm({...editForm, imageUrl: e.target.value})} />
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="w-full mt-2 text-[13px]"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          try {
+                            const preview = URL.createObjectURL(file);
+                            setEditPreview(preview);
+                            setEditForm({ ...editForm, imageUrl: 'Uploading...' });
+                            const url = await uploadFile(file);
+                            setEditForm({ ...editForm, imageUrl: url });
+                            setEditPreview(null);
+                            URL.revokeObjectURL(preview);
+                          } catch (err) {
+                            // eslint-disable-next-line no-console
+                            console.error('upload error', err);
+                            setEditForm({ ...editForm, imageUrl: '' });
+                            alert('Échec de l\'upload');
+                          }
+                        }}
+                      />
+                        {/* Preview for edit */}
+                        {/* Preview for edit: prefer local preview while uploading */}
+                        {editPreview ? (
+                          <img src={editPreview} alt={editForm.name || 'Preview'} className="mt-2 h-24 w-full object-contain rounded" />
+                        ) : editForm.imageUrl ? (
+                          editForm.imageUrl === 'Uploading...' ? (
+                            <div className="text-sm mt-2">Uploading...</div>
+                          ) : (/^https?:\/\//i).test(editForm.imageUrl) ? (
+                            <img src={editForm.imageUrl} alt={editForm.name || 'Preview'} className="mt-2 h-24 w-full object-contain rounded" />
+                          ) : null
+                        ) : null}
+                    </div>
                     <textarea className="w-full border rounded px-3 py-2" value={editForm.description} onChange={e=>setEditForm({...editForm, description: e.target.value})} />
+                    <div>
+                      <label className="block text-sm mb-1">Étiquettes (labels)</label>
+                      <textarea
+                        className="w-full border rounded px-3 py-2 text-sm"
+                        placeholder="Saisir les slugs séparés par des virgules (ex: soldes,nouveaute)"
+                        value={(((editForm as any).labels || []) as string[]).join(',')}
+                        onChange={e => setEditForm({ ...(editForm as any), labels: e.target.value.split(',').map(s=>s.trim()).filter(Boolean) } as any)}
+                      />
+                      <p className="text-xs text-slate-600 mt-1">Disponibles: {(promoState?.labels||[]).map((l:any)=>l.slug).join(', ')}</p>
+                    </div>
                     <div className="flex gap-3 justify-end">
                       <button type="button" onClick={cancelEdit} disabled={editSaving} className="px-4 py-2 border rounded active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed">Annuler</button>
                       <button disabled={editSaving} className="px-4 py-2 bg-black text-white rounded active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed">{editSaving ? 'Sauvegarde...' : 'Sauvegarder'}</button>
@@ -593,6 +772,11 @@ const AdminPage: React.FC = () => {
                   voucherText: String(fd.get('voucherText') || ''),
                   marqueeSpeedSeconds: Number(fd.get('marqueeSpeedSeconds') || promoState.marqueeSpeedSeconds || 18),
                   glowEnabled: fd.get('glowEnabled') === 'on',
+                  adBanner: {
+                    active: fd.get('adActive') === 'on',
+                    text: String(fd.get('adText') || ''),
+                    link: (String(fd.get('adLink') || '').trim() || undefined),
+                  },
                   loginBackground: {
                     desktop: String(fd.get('loginDesktop')||'').trim() || undefined,
                     mobile: String(fd.get('loginMobile')||'').trim() || undefined,
@@ -674,6 +858,23 @@ const AdminPage: React.FC = () => {
                   <input id="marqueeSpeedSeconds" name="marqueeSpeedSeconds" type="number" min={4} max={120} className="w-full border rounded px-3 py-2" defaultValue={promoState.marqueeSpeedSeconds || 18} />
                 </div>
                 <fieldset className="border rounded p-4">
+                  <legend className="text-sm font-medium px-2">Publicité (bandeau discret)</legend>
+                  <div className="flex items-center gap-2 mb-2">
+                    <input id="adActive" name="adActive" type="checkbox" defaultChecked={!!promoState.adBanner?.active} />
+                    <label htmlFor="adActive">Activer la publicité</label>
+                  </div>
+                  <div className="grid md:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs mb-1" htmlFor="adText">Texte</label>
+                      <input id="adText" name="adText" className="w-full border rounded px-2 py-1 text-sm" defaultValue={promoState.adBanner?.text || ''} />
+                    </div>
+                    <div>
+                      <label className="block text-xs mb-1" htmlFor="adLink">Lien (optionnel)</label>
+                      <input id="adLink" name="adLink" className="w-full border rounded px-2 py-1 text-sm" defaultValue={promoState.adBanner?.link || ''} />
+                    </div>
+                  </div>
+                </fieldset>
+                <fieldset className="border rounded p-4">
                   <legend className="text-sm font-medium px-2">Fond page Login</legend>
                   <div className="grid gap-3 md:grid-cols-3">
                     <div>
@@ -683,14 +884,22 @@ const AdminPage: React.FC = () => {
                         type="file"
                         accept="image/*"
                         className="mt-1 w-full border rounded px-2 py-1 text-[11px]"
-                        onChange={(e) => {
+                        onChange={async (e) => {
                           const file = e.target.files?.[0];
                           if (!file) return;
-                          const url = URL.createObjectURL(file);
                           const form = e.currentTarget.form as HTMLFormElement | null;
                           if (!form) return;
                           const input = form.querySelector<HTMLInputElement>('#loginDesktop');
-                          if (input) input.value = url;
+                          try {
+                            if (input) input.value = 'Uploading...';
+                            const url = await uploadFile(file);
+                            if (input) input.value = url;
+                          } catch (err) {
+                            if (input) input.value = '';
+                            // eslint-disable-next-line no-console
+                            console.error('upload error', err);
+                            alert('Échec de l\'upload');
+                          }
                         }}
                       />
                     </div>
@@ -701,14 +910,22 @@ const AdminPage: React.FC = () => {
                         type="file"
                         accept="image/*"
                         className="mt-1 w-full border rounded px-2 py-1 text-[11px]"
-                        onChange={(e) => {
+                        onChange={async (e) => {
                           const file = e.target.files?.[0];
                           if (!file) return;
-                          const url = URL.createObjectURL(file);
                           const form = e.currentTarget.form as HTMLFormElement | null;
                           if (!form) return;
                           const input = form.querySelector<HTMLInputElement>('#loginMobile');
-                          if (input) input.value = url;
+                          try {
+                            if (input) input.value = 'Uploading...';
+                            const url = await uploadFile(file);
+                            if (input) input.value = url;
+                          } catch (err) {
+                            if (input) input.value = '';
+                            // eslint-disable-next-line no-console
+                            console.error('upload error', err);
+                            alert('Échec de l\'upload');
+                          }
                         }}
                       />
                     </div>
@@ -742,14 +959,22 @@ const AdminPage: React.FC = () => {
                         type="file"
                         accept="image/*"
                         className="border rounded px-2 py-1 text-[11px] md:col-span-1"
-                        onChange={(e) => {
+                        onChange={async (e) => {
                           const file = e.target.files?.[0];
                           if (!file) return;
-                          const url = URL.createObjectURL(file);
                           const form = e.currentTarget.form as HTMLFormElement | null;
                           if (!form) return;
                           const input = form.querySelector<HTMLInputElement>(`input[name="bg${key.charAt(0).toUpperCase()+key.slice(1)}Desktop"]`);
-                          if (input) input.value = url;
+                          try {
+                            if (input) input.value = 'Uploading...';
+                            const url = await uploadFile(file);
+                            if (input) input.value = url;
+                          } catch (err) {
+                            if (input) input.value = '';
+                            // eslint-disable-next-line no-console
+                            console.error('upload error', err);
+                            alert('Échec de l\'upload');
+                          }
                         }}
                       />
                       {/* Mobile URL */}
@@ -764,14 +989,22 @@ const AdminPage: React.FC = () => {
                         type="file"
                         accept="image/*"
                         className="border rounded px-2 py-1 text-[11px] md:col-span-1"
-                        onChange={(e) => {
+                        onChange={async (e) => {
                           const file = e.target.files?.[0];
                           if (!file) return;
-                          const url = URL.createObjectURL(file);
                           const form = e.currentTarget.form as HTMLFormElement | null;
                           if (!form) return;
                           const input = form.querySelector<HTMLInputElement>(`input[name="bg${key.charAt(0).toUpperCase()+key.slice(1)}Mobile"]`);
-                          if (input) input.value = url;
+                          try {
+                            if (input) input.value = 'Uploading...';
+                            const url = await uploadFile(file);
+                            if (input) input.value = url;
+                          } catch (err) {
+                            if (input) input.value = '';
+                            // eslint-disable-next-line no-console
+                            console.error('upload error', err);
+                            alert('Échec de l\'upload');
+                          }
                         }}
                       />
                       {/* Fallback CSV + Alt */}
@@ -797,7 +1030,7 @@ const AdminPage: React.FC = () => {
                 </fieldset>
                 <div className="flex gap-3">
                   <button className="btn-primary px-4 py-2">Enregistrer</button>
-                  <button type="button" className="px-4 py-2 border rounded active:scale-95 transition-transform" onClick={(ev) => {
+                  <button type="button" className="px-4 py-2 border rounded" onClick={(ev) => {
                     const form = (ev.currentTarget as HTMLButtonElement).closest('form') as HTMLFormElement;
                     if (!form) return;
                     const fd = new FormData(form);
@@ -864,9 +1097,77 @@ const AdminPage: React.FC = () => {
             )}
           </div>
         )}
+
+        {tab === 'ads' && (
+          <div className="bg-white/95 text-charcoal p-6 rounded shadow max-w-2xl">
+            <h2 className="font-semibold mb-4">Publicités (bandeau discret)</h2>
+            {promoLoading && <div>Chargement...</div>}
+            {promoState && (
+              <form className="space-y-6" onSubmit={async (e) => {
+                e.preventDefault();
+                const fd = new FormData(e.currentTarget as HTMLFormElement);
+                const body: any = {
+                  adBanner: {
+                    active: fd.get('adActive') === 'on',
+                    text: String(fd.get('adText') || ''),
+                    link: (String(fd.get('adLink') || '').trim() || undefined),
+                  },
+                  adBanners: (() => {
+                    const raw = String(fd.get('adBanners') || '').trim();
+                    if (!raw) return promoState.adBanners || [];
+                    try {
+                      const parsed = JSON.parse(raw);
+                      if (Array.isArray(parsed)) return parsed;
+                    } catch {/* ignore */}
+                    return promoState.adBanners || [];
+                  })()
+                };
+                const res = await fetch(apiUrl('/api/promotions/admin'), {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  credentials: 'include',
+                  body: JSON.stringify(body),
+                });
+                if (res.ok) setPromoState(await res.json());
+              }}>
+                <div className="flex items-center gap-2">
+                  <input id="adActive" name="adActive" type="checkbox" defaultChecked={!!promoState.adBanner?.active} />
+                  <label htmlFor="adActive">Activer la publicité</label>
+                </div>
+                <div>
+                  <label className="block text-sm mb-1" htmlFor="adText">Texte</label>
+                  <input id="adText" name="adText" className="w-full border rounded px-3 py-2" defaultValue={promoState.adBanner?.text || ''} />
+                </div>
+                <div>
+                  <label className="block text-sm mb-1" htmlFor="adLink">Lien (optionnel)</label>
+                  <input id="adLink" name="adLink" className="w-full border rounded px-3 py-2" defaultValue={promoState.adBanner?.link || ''} />
+                </div>
+                <fieldset className="border rounded p-4 space-y-2">
+                  <legend className="text-sm font-medium px-2">Multiples publicités (JSON)</legend>
+                  <textarea
+                    name="adBanners"
+                    className="w-full border rounded px-2 py-1 text-xs h-32"
+                    defaultValue={JSON.stringify(promoState.adBanners || [], null, 2)}
+                    placeholder='[
+  {"id":"ad-1","active":true,"text":"Annonce 1","link":"https://exemple.com"}
+]'
+                  />
+                  <p className="text-[11px] text-gray-500">Format: [{'{'}"id":"ad-1","active":true,"text":"Votre texte","link":"https://..."{'}'}]</p>
+                </fieldset>
+                <div className="flex gap-3">
+                  <button className="btn-primary px-4 py-2">Enregistrer</button>
+                </div>
+              </form>
+            )}
+            {!promoState && !promoLoading && (
+              <div className="text-sm text-gray-600">Aucune configuration de promotion chargée.</div>
+            )}
+          </div>
+        )}
       </div>
-      </PageBackground>
-    </ProtectedRoute>
+        </PageBackground>
+      </ProtectedRoute>
+    </ErrorBoundary>
   );
 };
 

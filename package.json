@@ -11,13 +11,12 @@
     "dev:client": "vite",
     "build": "npm run build:client && npm run build:server",
     "build:server": "tsc -p tsconfig.server.json",
-  "build:client": "vite build",
-  "preview": "vite preview --port 3000",
-  "reset-admin": "tsx scripts/reset-admin.ts",
+    "build:client": "vite build",
+    "preview": "vite preview --port 3000",
+    "reset-admin": "tsx scripts/reset-admin.ts",
     "make:admin": "tsx scripts/make-admin.ts",
     "migrate": "tsx scripts/migrate.ts",
     "test": "vitest run",
-    "prod": "pm2 start ecosystem.config.cjs --env production",
     "drizzle:generate": "drizzle-kit generate:pg --schema=src-server/db/schema.ts --out=drizzle/migrations",
     "drizzle:migrate": "drizzle-kit migrate:pg --schema=src-server/db/schema.ts --out=drizzle/migrations"
   },
@@ -31,8 +30,6 @@
   "author": "AI Studio",
   "license": "ISC",
   "dependencies": {
-    "firebase": "^10.12.0",
-    "firebase-admin": "^11.11.0",
     "@google-cloud/cloud-sql-connector": "^1.5.1",
     "bcryptjs": "^2.4.3",
     "compression": "^1.7.4",
@@ -42,20 +39,22 @@
     "drizzle-orm": "^0.36.0",
     "express": "^4.19.2",
     "express-rate-limit": "^7.4.0",
+    "firebase": "^10.12.0",
+    "firebase-admin": "^11.11.0",
+    "firebase-functions": "^7.0.2",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
+    "multer": "^2.0.0",
     "pg": "^8.16.3",
-    "pm2": "^5.4.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^6.28.0",
+    "stripe": "^19.3.1",
     "winston": "^3.13.0",
-    "zod": "^3.23.8",
-    "stripe": "^19.3.1"
-    ,
-    "multer": "^2.0.0"
+    "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.18",
     "@testing-library/jest-dom": "^6.4.2",
     "@testing-library/react": "^16.0.0",
     "@testing-library/user-event": "^14.6.1",
@@ -72,14 +71,16 @@
     "@types/react-dom": "^19.0.2",
     "@types/supertest": "^6.0.3",
     "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.23",
     "concurrently": "^8.2.2",
     "drizzle-kit": "^0.24.0",
     "jsdom": "^27.2.0",
+    "postcss": "^8.5.6",
     "supertest": "^7.1.4",
+    "tailwindcss": "^4.1.18",
     "tsx": "^4.15.2",
     "typescript": "^5.4.5",
     "vite": "^5.4.8",
     "vitest": "^4.0.9"
-  },
-  "optionalDependencies": {}
+  }
 }

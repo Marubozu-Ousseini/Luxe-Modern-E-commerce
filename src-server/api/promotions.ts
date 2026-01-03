@@ -47,6 +47,9 @@ router.put('/admin', (req, res) => {
     marqueeSpeedSeconds: z.number().int().min(4).max(120).optional(),
     glowEnabled: z.boolean().optional(),
   stickers: stickersSchema,
+  adBanner: z.object({ active: z.boolean(), text: z.string().min(1).max(200), link: z.string().url().optional() }).optional(),
+  adBanners: z.array(z.object({ id: z.string().min(1), active: z.boolean(), text: z.string().min(1).max(200), link: z.string().url().optional() })).optional(),
+  labels: z.array(z.object({ id: z.number().int(), text: z.string(), slug: z.string(), type: z.enum(['discount','status','offer','urgency']), color_hint: z.string(), description: z.string() })).optional(),
   });
   const parsed = schema.safeParse(req.body ?? {});
   if (!parsed.success) return res.status(400).json({ message: 'Paramètres invalides', details: parsed.error.flatten() });

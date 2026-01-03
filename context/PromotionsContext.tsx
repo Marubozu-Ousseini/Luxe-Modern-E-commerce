@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { useAuth } from './AuthContext';
 
 // Frontend copy of PromotionsState (subset + extras we consume). Keep in sync with backend if extended.
 export interface PromotionsState {
@@ -25,7 +24,6 @@ const PromotionsContext = createContext<PromotionsContextValue | undefined>(unde
 export const PromotionsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [promotions, setPromotions] = useState<PromotionsState | null>(null);
   const [loading, setLoading] = useState(false);
-  const { user } = useAuth();
 
   const load = async () => {
     if (loading) return; // avoid overlapping
@@ -41,16 +39,10 @@ export const PromotionsProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   useEffect(() => {
-    if (!user) {
-      // Clear promotions when logged out and stop polling
-      setPromotions(null);
-      return;
-    }
     load();
-    // periodic refresh in case admin changes config
     const id = setInterval(load, 60_000);
     return () => clearInterval(id);
-  }, [user]);
+  }, []);
 
   return (
     <PromotionsContext.Provider value={{ promotions, refresh: load }}>

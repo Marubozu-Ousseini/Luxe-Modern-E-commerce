@@ -5,7 +5,6 @@ import { useFavorites } from '../context/FavoritesContext.tsx';
 import { Product, CartItem } from '../types.ts';
 import { getProducts } from '../services/productService.ts';
 import Cart from '../components/Cart.tsx';
-import PromotionBanner from '../components/PromotionBanner.tsx';
 import EmptyState from '../components/EmptyState.tsx';
 
 const Favoris: React.FC = () => {
@@ -55,8 +54,7 @@ const Favoris: React.FC = () => {
   const totalCartItems = cartItems.reduce((t, i) => t + i.quantity, 0);
 
   return (
-    <div className="min-h-screen bg-beige">
-      <PromotionBanner />
+    <div className="min-h-screen bg-porcelain">
       <Header
         onCartClick={() => setIsCartOpen(true)}
         cartItemCount={totalCartItems}

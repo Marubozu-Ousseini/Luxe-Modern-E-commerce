@@ -4,14 +4,15 @@ Cette application est une plateforme e-commerce moderne, performante et sécuris
 
 ## Architecture
 
-L'application est conçue pour fonctionner sur une seule instance (ex: GCE e2-micro ou Cloud Run) afin de minimiser les coûts.
+L'architecture cible est 100% serverless pour bénéficier du modèle à la demande de GCP.
 
--   **Frontend** : Application React (Single Page Application) construite en fichiers statiques.
--   **Backend** : Serveur Node.js avec Express qui remplit deux rôles :
-    1.  Servir les fichiers statiques du frontend React.
-    2.  Exposer une API RESTful pour la gestion des données (produits, utilisateurs, commandes, etc.).
--   **Base de données** : Conçue pour utiliser PostgreSQL (via Cloud SQL).
--   **Stockage Média** : Les images des produits sont destinées à être stockées sur Google Cloud Storage pour plus de scalabilité et de performance.
+-   **Frontend** : Application React (SPA) compilée avec Vite puis servie depuis un bucket Cloud Storage derrière Cloud CDN (ou Firebase Hosting). CDN gère HTTPS et cache longue durée.
+-   **Backend/API** : Serveur Node.js/Express conteneurisé et exécuté sur Cloud Run (Gen2) avec CPU=1, 512 MiB, `concurrency=80`, `minInstances=0`, `maxInstances=5`. CPU n'est facturé que pendant les requêtes.
+-   **Scripts Admin** : Tâches ponctuelles (reset admin, migrations) exécutées via Cloud Run Jobs pour éviter des conteneurs persistants.
+-   **Base de données** : Cloud SQL Postgres `db-f1-micro` avec IAM auth et mot de passe stocké dans Secret Manager. Elle est désactivée par défaut (`enable_cloud_sql=false`) pour réduire les coûts lorsqu'aucune fonctionnalité relationnelle n'est requise.
+-   **Secrets & Config** : Google Secret Manager stocke `jwt-secret`, `admin-password`, `db-password`, `stripe-*`. Terraform référence toujours `version = "latest"` pour simplifier la rotation.
+-   **CI/CD** : Cloud Build trigger (GitHub) lance tests, build client + serveur, synchronise le bundle statique, construit l'image via Kaniko (cache 48h) puis déploie Cloud Run.
+-   **Observabilité & coûts** : Log retention ramenée à 30 jours, métrique `db-connection-failures`, uptime check `https://api.<domaine>/health`, budgets GCP optionnels (50/80/100%).
 
 ## Fonctionnalités (Cibles)
 
@@ -66,32 +67,39 @@ L'application est conçue pour fonctionner sur une seule instance (ex: GCE e2-mi
     ```
     Le serveur sera accessible à l'adresse `http://localhost:8080`.
 
-## Déploiement sur GCP (Compute Engine e2-micro)
+## Déploiement serverless (Cloud Run + Cloud Storage)
 
-1.  **Build de l'application**
-    Avant de déployer, compilez le code TypeScript du serveur en JavaScript.
+1. **Préparer les variables Terraform**
+    - Copier `infra/terraform/terraform.tfvars.example` vers `terraform.tfvars` et renseigner `project_id`, `region (europe-west1)`, `domain`, `bucket_name`, secrets (`jwt_secret`, `admin_password`, etc.).
+    - Laisser `enable_cloud_sql=false` jusqu'à ce que Postgres soit nécessaire.
+    - (Optionnel) Renseigner `billing_account_id` pour créer un budget automatisé.
+
+2. **Provisionner l'infrastructure**
     ```bash
-    npm run build
+    cd infra/terraform
+    terraform init
+    terraform plan
+    terraform apply
     ```
-    Cette commande va créer un dossier `dist/` contenant le code serveur prêt pour la production.
+    Cela crée : bucket statique + CDN, Cloud Run service, secrets, triggers Cloud Build, métriques, budgets (si configurés).
 
-2.  **Configuration de l'instance GCE**
-    -   Créez une instance `e2-micro` dans une région éligible au Free Tier (ex: `us-central1`).
-    -   Installez Node.js, npm et git sur l'instance.
-    -   Ouvrez les ports HTTP (80) et HTTPS (443) dans les règles de pare-feu.
+3. **Connecter Cloud Build à GitHub**
+    - Terraform crée le trigger `luxe-modern-ecommerce-api-deploy`. Autorisez-le dans la console Cloud Build (OAuth GitHub).
+    - Chaque push sur `main` lancera `cloudbuild.yaml`.
 
-3.  **Déploiement du code**
-    -   Clonez votre dépôt sur l'instance.
-    -   Installez les dépendances de production : `npm install --production`.
-    -   Copiez vos variables d'environnement de production (par exemple via Secret Manager).
+4. **Pipeline Cloud Build (`cloudbuild.yaml`)**
+    - `npm ci`, tests unitaires + smoke, build client (`dist/client`) et serveur (`dist/`), upload statique (si `_DEPLOY_STATIC=true`) vers `gs://<bucket>`.
+    - Kaniko construit/publie l'image `$_REGION-docker.pkg.dev/<project>/<repo>/<service>:$_IMAGE_TAG` avec cache de couches.
+    - (Optionnel) Migrations `node dist/scripts/migrate.js` si `_RUN_MIGRATIONS=true` et secret `DATABASE_URL` disponible.
+    - `gcloud run deploy` applique CPU/mémoire/concurrency recommandés.
 
-4.  **Lancement avec PM2**
-    PM2 est un gestionnaire de processus qui maintiendra l'application en ligne.
-    ```bash
-    npm install -g pm2
-    npm run prod
-    ```
-    Le fichier `ecosystem.config.cjs` est configuré pour lancer l'application en mode `cluster` pour une meilleure performance.
+5. **DNS**
+    - Pointer `@` et `www` vers l'IP globale Terraform (`lb_ip_address`).
+    - Pointer `api.<domaine>` vers l'URL Cloud Run (ou configurer une domain mapping gérée par GCP).
+
+6. **Vérifications post-déploiement**
+    - Executer l'uptime check (`monitoring.tf`), confirmer que `db-connection-failures` reste à 0.
+    - En cas de Postgres activé, lancer `gcloud run jobs execute <service>-reset-admin` pour réinitialiser l'admin.
 
 ## Updating the Admin Password (Recommended)
 
@@ -115,8 +123,8 @@ gcloud secrets versions disable <VERSION_NUMBER> --secret=admin-password --proje
 This approach avoids baking credentials into images or editing runtime files inside containers. It seeds or updates the admin account on service startup when the app reads `ADMIN_PASSWORD` from the environment.
 ## Accès Admin et Backend
 
-- URL publique du site: `https://www.malafaareh.com`
-- Backend API est servi par le même hôte (ex: `https://www.malafaareh.com/api/...`).
+- URL publique du site: `https://www.malafaareh.com` (hébergé depuis Cloud Storage + Cloud CDN).
+- Backend API exposé via Cloud Run: `https://api.malafaareh.com` (ou l'URL auto-générée Cloud Run si le DNS n'est pas encore configuré).
 - Page d'administration frontend: `https://www.malafaareh.com/admin`
 
 ### Création automatique de l'admin

@@ -4,57 +4,18 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Malafaareh — E-commerce Moderne</title>
+  <title>Malafaareh</title>
     <!-- Fonts: Cormorant Garamond (serif headings) + Inter (body/UI) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      // Tailwind via CDN with extended theme tokens for the "Luxurious Zen" system
-      tailwind.config = {
-        theme: {
-          extend: {
-            fontFamily: {
-              serif: ['Cormorant Garamond', 'serif'],
-              sans: ['Inter', 'system-ui', 'Avenir', 'Helvetica', 'Arial', 'sans-serif']
-            },
-            colors: {
-              // Luxurious Zen palette
-              porcelain: '#FAF8F5',
-              bone: '#F2EEE8',
-              charcoal: '#1C1C1C',
-              slate: '#2A2A2A',
-              taupe: '#8A7E72',
-              sand: '#D8CFC4',
-              accent: '#4169E1', // Royal Blue as action color
-              royal: '#4169E1',  // explicit royal blue
-              header: '#0A1F64', // deep header blue per request
-              brown: '#5A3E2B',
-              beige: '#F5F0E6',
-            canary: '#FFEF00', // bright canary yellow for stars
-            bronze: '#8C6A3C', // optional accent alt
-            gold: '#B08D57'   // optional accent alt
-            },
-            boxShadow: {
-              'soft': '0 8px 24px rgba(0,0,0,0.06)'
-            },
-            transitionTimingFunction: {
-              'premium': 'cubic-bezier(0.22, 1, 0.36, 1)'
-            },
-            maxWidth: {
-              'content': '1320px'
-            },
-          }
-        }
-      }
-    </script>
+    <!-- Tailwind is compiled via PostCSS; styles imported in index.tsx -->
     <style>
       :root {
         --color-bg: #FAF8F5; /* porcelain */
         --color-text: #1C1C1C; /* charcoal */
         --color-muted: #6C6C6C;
-        --color-accent: #4169E1; /* royal blue */
+        --color-accent: #0078FF; /* shiny azure blue */
         --shadow-soft: 0 8px 24px rgba(0,0,0,0.06);
         --ease: cubic-bezier(0.22, 1, 0.36, 1);
       }
@@ -63,27 +24,27 @@
       h3, h4 { letter-spacing: -0.01em; }
 
       .btn-primary {
-        background: var(--color-accent);
+        background: linear-gradient(135deg, #008CFF 0%, #0078FF 60%, #3FA9FF 100%);
         color: white;
         padding: 0.75rem 1.25rem;
         border-radius: 0.5rem;
         box-shadow: var(--shadow-soft);
         transition: transform 150ms var(--ease, cubic-bezier(0.22, 1, 0.36, 1)), opacity 150ms;
       }
-      .btn-primary:hover { transform: translateY(-1px) scale(1.02); }
+      .btn-primary:hover { transform: translateY(-1px) scale(1.02); filter: saturate(1.1); }
       .btn-secondary {
         background: white;
         color: var(--color-accent);
         padding: 0.75rem 1.25rem;
         border-radius: 0.5rem;
-        border: 1px solid rgba(65,105,225,0.18);
+        border: 1px solid rgba(0,120,255,0.18);
         box-shadow: var(--shadow-soft);
         transition: transform 150ms var(--ease, cubic-bezier(0.22, 1, 0.36, 1)), background-color 150ms, color 150ms, border-color 150ms;
       }
       .btn-secondary:hover {
         transform: translateY(-1px) scale(1.02);
-        background-color: rgba(239,246,255,1);
-        border-color: rgba(65,105,225,0.35);
+        background-color: rgba(0,120,255,0.06);
+        border-color: rgba(0,120,255,0.28);
       }
       .btn-outline {
         background: transparent;
@@ -120,14 +81,14 @@
       textarea:focus-visible,
       [role="button"]:focus-visible {
         outline: none;
-        box-shadow: 0 0 0 3px rgba(15, 61, 62, 0.35);
+        box-shadow: 0 0 0 3px rgba(0, 120, 255, 0.35);
         border-radius: 8px;
       }
       @keyframes shake-cart {
-        10%, 90% { transform: translate3d(-1px, 0, 0) rotate(-5deg); }
-        20%, 80% { transform: translate3d(2px, 0, 0) rotate(5deg); }
-        30%, 50%, 70% { transform: translate3d(-4px, 0, 0) rotate(-5deg); }
-        40%, 60% { transform: translate3d(4px, 0, 0) rotate(5deg); }
+        10%, 90% { transform: translate3d(-0.5px, 0, 0) rotate(-3deg); }
+        20%, 80% { transform: translate3d(1px, 0, 0) rotate(3deg); }
+        30%, 50%, 70% { transform: translate3d(-2px, 0, 0) rotate(-3deg); }
+        40%, 60% { transform: translate3d(2px, 0, 0) rotate(3deg); }
       }
       .cart-shake {
         animation: shake-cart 0.6s cubic-bezier(.36,.07,.19,.97) both;
@@ -139,8 +100,7 @@
       .animate-fade-in {
         animation: fade-in 0.5s ease-out forwards;
       }
-        /* Glossy effect for canary stars */
-        .glossy-star { filter: drop-shadow(0 1px 1px rgba(255,239,0,0.6)) drop-shadow(0 0 6px rgba(255,239,0,0.25)); }
+        /* Elevate accents subtly; avoid glossy effects */
       /* Motion reduction support */
       @media (prefers-reduced-motion: reduce) {
         * {
@@ -152,7 +112,7 @@
       }
     </style>
 </head>
-  <body class="bg-beige text-charcoal font-sans">
+  <body class="bg-porcelain text-charcoal font-sans">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>

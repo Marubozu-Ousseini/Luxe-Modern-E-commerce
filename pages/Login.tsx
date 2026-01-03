@@ -14,7 +14,7 @@ const LoginPage: React.FC = () => {
     e.preventDefault();
     setError(null);
     try {
-      await login(email, password);
+      await login(email.trim(), password);
       navigate('/');
     } catch (err: any) {
       setError(err?.message || 'Erreur de connexion');

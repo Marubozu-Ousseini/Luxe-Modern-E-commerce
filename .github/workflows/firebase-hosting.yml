@@ -1,0 +1,42 @@
+name: Firebase Hosting Deploy
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy-hosting:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Authenticate to Google Cloud (Workload Identity Federation)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+
+      - name: Install dependencies and build client
+        run: |
+          npm ci
+          npm run build:client
+
+      - name: Install Firebase CLI
+        run: |
+          npm install -g firebase-tools
+
+      - name: Deploy Hosting (and Functions)
+        env:
+          PROJECT_ID: malafaareh-481713
+        run: |
+          firebase deploy --only hosting,functions --project "$PROJECT_ID"
