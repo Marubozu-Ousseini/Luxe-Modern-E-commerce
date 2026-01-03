@@ -50,3 +50,7 @@ gh secret set GCP_PROJECT_ID -r "$REPO" --body "malafaareh-481713"
 ## Notes
 - Org policies may block invoker grants needed for Functions v2 (Cloud Run) routing from Hosting; coordinate Option A (project-level exception) as documented in `README-Firebase.md`.
 - For Functions deploy, ensure your function runtime and regions are supported (this repo uses `nodejs20` and `us-central1`).
+
+---
+
+CI trigger: 2026-01-03
