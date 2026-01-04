@@ -1,0 +1,56 @@
+name: Headless QA (Mobile)
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  headless-qa:
+    name: Run headless mobile QA
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Start dev (client + server)
+        run: |
+          nohup npm run dev > dev.log 2>&1 &
+          echo $! > dev.pid
+
+      - name: Wait for site to be available
+        run: |
+          for i in $(seq 1 30); do
+            for port in 3000 3001 5173; do
+              status=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:$port || true)
+              if [ "$status" = "200" ] || [ "$status" = "302" ]; then
+                echo "URL=http://localhost:$port" >> $GITHUB_ENV
+                echo "Site available at http://localhost:$port"
+                exit 0
+              fi
+            done
+            sleep 2
+          done
+          echo "Site did not become available"; cat dev.log || true; exit 1
+
+      - name: Run headless QA script
+        env:
+          NODE_OPTIONS: "--no-experimental-fetch"
+        run: |
+          echo "Running QA against $URL"
+          node scripts/headless_qa_mobile_checks.cjs --url "$URL"
+
+      - name: Upload dev log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dev-log
+          path: dev.log
