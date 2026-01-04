@@ -25,7 +25,8 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onSelect, onAddToCar
   return (
     <div
       onClick={onSelect}
-      className="bg-white rounded-lg shadow-soft overflow-hidden group cursor-pointer transition-all duration-200 ease-premium hover:-translate-y-1 hover:shadow-xl flex flex-col"
+      tabIndex={0}
+      className="bg-white rounded-lg shadow-soft overflow-hidden group cursor-pointer transition-all duration-200 ease-premium hover:-translate-y-1 hover:shadow-xl flex flex-col focus:outline-none focus:ring-2 focus:ring-accent/20"
     >
       <div className="relative pt-[125%] overflow-hidden">
         <img
@@ -43,37 +44,40 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onSelect, onAddToCar
           <button
             onClick={(e) => { e.stopPropagation(); toggleFavorite(product.id); }}
             aria-label={fav ? 'Retirer des favoris' : 'Ajouter aux favoris'}
-            className={`h-9 w-9 rounded-full flex items-center justify-center shadow-sm transition-colors backdrop-blur bg-white/85 border ${fav ? 'border-red-500 text-red-600 heart-pop' : 'border-gray-200 text-slate-600'} hover:border-red-500 hover:text-red-600`}
+            className={`h-11 w-11 sm:h-9 sm:w-9 rounded-full flex items-center justify-center shadow-sm transition-colors backdrop-blur bg-white/85 border ${fav ? 'border-accent text-accent heart-pop' : 'border-gray-200 text-slate-600'} hover:border-accent hover:text-accent`}
           >
             <HeartIcon className={`h-5 w-5 transition-transform ${fav ? 'fill-current' : 'fill-none stroke-current'}`} />
           </button>
-          {stickers.length > 0 && (
-            <div className="flex flex-col items-end gap-2">
-              {stickers.map(s => (
-                s.href ? (
-                  <a key={s.id} href={s.href} onClick={e => e.stopPropagation()} className="inline-flex items-center justify-center">
-                    {s.imageUrl ? (
-                      <img src={s.imageUrl} alt={s.text || s.id} loading="lazy" className="h-10 w-10 object-contain drop-shadow-md rounded" />
-                    ) : (
-                      <span className="inline-block text-[11px] px-2 py-1 rounded-full bg-white/85 backdrop-blur border border-gray-200 text-slate-700 shadow-sm">
-                        {s.text || s.id}
-                      </span>
-                    )}
-                  </a>
-                ) : (
-                  <span key={s.id} className="inline-flex items-center justify-center">
-                    {s.imageUrl ? (
-                      <img src={s.imageUrl} alt={s.text || s.id} loading="lazy" className="h-10 w-10 object-contain drop-shadow-md rounded" />
-                    ) : (
-                      <span className="inline-block text-[11px] px-2 py-1 rounded-full bg-white/85 backdrop-blur border border-gray-200 text-slate-700 shadow-sm">
-                        {s.text || s.id}
-                      </span>
-                    )}
-                  </span>
-                )
-              ))}
-            </div>
-          )}
+            {stickers.length > 0 && (
+              <div className="flex flex-col items-end gap-2">
+                {/* show only primary sticker on the small card */}
+                {(() => {
+                  const s = stickers[0];
+                  if (!s) return null;
+                  return s.href ? (
+                    <a key={s.id} href={s.href} onClick={e => e.stopPropagation()} className="inline-flex items-center justify-center">
+                      {s.imageUrl ? (
+                        <img src={s.imageUrl} alt={s.text || s.id} loading="lazy" className="h-10 w-10 object-contain drop-shadow-md rounded" />
+                      ) : (
+                        <span className="inline-block text-[11px] px-2 py-1 rounded-full bg-white/85 backdrop-blur border border-gray-200 text-slate-700 shadow-sm">
+                          {s.text || s.id}
+                        </span>
+                      )}
+                    </a>
+                  ) : (
+                    <span key={s.id} className="inline-flex items-center justify-center">
+                      {s.imageUrl ? (
+                        <img src={s.imageUrl} alt={s.text || s.id} loading="lazy" className="h-10 w-10 object-contain drop-shadow-md rounded" />
+                      ) : (
+                        <span className="inline-block text-[11px] px-2 py-1 rounded-full bg-white/85 backdrop-blur border border-gray-200 text-slate-700 shadow-sm">
+                          {s.text || s.id}
+                        </span>
+                      )}
+                    </span>
+                  );
+                })()}
+              </div>
+            )}
         </div>
         {product.limitedAvailability && (
           <span className="absolute top-3 left-3 z-10 inline-block text-[11px] px-2 py-1 rounded-full bg-white/85 backdrop-blur border border-sand text-slate-700">
@@ -100,17 +104,17 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onSelect, onAddToCar
           <div className="flex flex-col">
             {product.originalPrice && product.originalPrice > product.price ? (
               <div className="flex flex-col">
-                <span className="text-sm line-through text-red-600">{formatCurrency(product.originalPrice)}</span>
-                <span className="text-xl font-semibold text-black">{formatCurrency(product.price)}</span>
-                <span className="text-sm text-green-600 animate-pulse">Vous gagnez {formatCurrency(product.originalPrice - product.price)}</span>
+                <span className="text-sm line-through text-taupe">{formatCurrency(product.originalPrice)}</span>
+                <span className="text-xl font-semibold text-charcoal">{formatCurrency(product.price)}</span>
+                <span className="text-sm text-slate-700">Vous gagnez {formatCurrency(product.originalPrice - product.price)}</span>
               </div>
             ) : (
-              <p className="text-xl font-semibold text-black">{formatCurrency(product.price)}</p>
+              <p className="text-xl font-semibold text-charcoal">{formatCurrency(product.price)}</p>
             )}
           </div>
           <button
             onClick={handleAddToCartClick}
-            className="flex items-center justify-center h-10 w-10 rounded-full bg-accent text-white opacity-0 translate-x-3 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200 ease-premium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent"
+            className="flex items-center justify-center h-11 w-11 sm:h-10 sm:w-10 rounded-full bg-accent text-white opacity-0 translate-x-3 group-hover:opacity-100 group-hover:translate-x-0 group-focus:opacity-100 group-focus:translate-x-0 focus:opacity-100 focus:translate-x-0 transition-all duration-200 ease-premium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent/40"
             aria-label="Ajouter au panier"
           >
             <CartIcon className="h-5 w-5" />

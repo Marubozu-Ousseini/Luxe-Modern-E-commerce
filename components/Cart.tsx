@@ -92,7 +92,7 @@ const Cart: React.FC<CartProps> = ({ isOpen, onClose, items, onUpdateQuantity, o
                            <button onClick={() => onUpdateQuantity(item.product.id, item.quantity + 1)} className="px-2 py-1 text-gray-500 hover:text-gray-700" aria-label="Augmenter la quantité">+</button>
                         </div>
                         <div className="flex">
-                          <button onClick={() => onRemove(item.product.id)} type="button" className="font-medium text-accent hover:opacity-90" aria-label="Supprimer l'article">
+                          <button onClick={() => onRemove(item.product.id)} type="button" className="font-medium text-slate hover:text-charcoal" aria-label="Supprimer l'article">
                             <TrashIcon className="h-5 w-5"/>
                           </button>
                         </div>
@@ -135,33 +135,7 @@ const Cart: React.FC<CartProps> = ({ isOpen, onClose, items, onUpdateQuantity, o
                 <div className="space-y-3">
                   <div>
                     <label className="block text-sm mb-1">Code promo</label>
-                    <div className="flex gap-2">
-                      <input
-                        value={couponCode}
-                        onChange={e=>setCouponCode(e.target.value)}
-                        className="flex-1 border rounded px-3 py-2"
-                        placeholder="Ex: SAVE10, SAVE20, GIFT-XXXX"
-                      />
-                      <button
-                        type="button"
-                        className="px-3 py-2 border rounded"
-                        onClick={() => {
-                          const code = couponCode.trim().toUpperCase();
-                          if (!code) { setCouponApplied(null); return; }
-                          // Simple demo rules: SAVE10/20 = percent; GIFT-XXXX = 1000 XAF
-                          if (code === 'SAVE10') setCouponApplied({ code, type: 'percent', value: 10 });
-                          else if (code === 'SAVE20') setCouponApplied({ code, type: 'percent', value: 20 });
-                          else if (code.startsWith('GIFT-')) setCouponApplied({ code, type: 'amount', value: 1000 });
-                          else {
-                            alert('Code promo invalide');
-                            setCouponApplied(null);
-                          }
-                        }}
-                      >Appliquer</button>
-                    </div>
-                    {couponApplied && (
-                      <p className="mt-1 text-xs text-slate-600">Remise appliquée: {couponApplied.type === 'percent' ? `${couponApplied.value}%` : `${formatCurrency(couponApplied.value)}`} · Total: {formatCurrency(totalAfterDiscount)}</p>
-                    )}
+                    <p className="text-sm text-slate-600">Saisissez votre code promo lors du paiement sur la page de commande.</p>
                   </div>
                   <div>
                     <label className="block text-sm mb-1">Mode de paiement</label>
@@ -171,19 +145,21 @@ const Cart: React.FC<CartProps> = ({ isOpen, onClose, items, onUpdateQuantity, o
                       <option value="on_delivery">Paiement à la livraison</option>
                     </select>
                   </div>
-                  <button onClick={async (ev) => {
-                    ev.preventDefault();
-                    try {
-                      const payload = items.map(i => ({ productId: i.product.id, quantity: i.quantity }));
-                      const order = await createOrder(payload, paymentMethod, couponApplied?.code);
-                      // navigate to orders page
-                      window.location.href = '/orders';
-                    } catch (err: any) {
-                      alert(err?.message || 'Erreur lors de la commande');
-                    }
-                  }} className="w-full flex items-center justify-center rounded-md border border-transparent btn-primary px-6 py-3 text-base font-medium">
-                    Passer au paiement
-                  </button>
+                  <div className="grid grid-cols-2 gap-3">
+                    <a href="/checkout" className="flex items-center justify-center rounded-md btn-secondary px-6 py-3 text-base font-medium">Finaliser la commande</a>
+                    <button onClick={async (ev) => {
+                      ev.preventDefault();
+                      try {
+                        const payload = items.map(i => ({ productId: i.product.id, quantity: i.quantity }));
+                        const order = await createOrder(payload, paymentMethod, couponApplied?.code);
+                        window.location.href = '/orders';
+                      } catch (err: any) {
+                        alert(err?.message || 'Erreur lors de la commande');
+                      }
+                    }} className="w-full flex items-center justify-center rounded-md border border-transparent btn-primary px-6 py-3 text-base font-medium">
+                      Payer maintenant
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
