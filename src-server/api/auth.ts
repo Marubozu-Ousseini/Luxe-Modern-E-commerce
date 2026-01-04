@@ -33,6 +33,12 @@ router.post('/login', async (req, res) => {
     if (!email || !password) return res.status(400).json({ message: 'Champs requis manquants' });
     email = String(email).trim();
     const user = isDbAvailable() ? await findUserByEmailAsync(email) : findUserByEmail(email);
+    // Debugging: log when user not found or password mismatch in test environment
+    if (!user) {
+      logger.warn('[auth] login: user not found', { email });
+    } else {
+      logger.info('[auth] login: found user', { email: user.email, role: user.role, hasPassword: !!user.passwordHash });
+    }
     if (!user || !verifyPassword(password, user.passwordHash)) {
       return res.status(401).json({ message: 'Identifiants invalides' });
     }
