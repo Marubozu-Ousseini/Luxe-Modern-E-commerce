@@ -32,6 +32,11 @@ export default function PromotionBanner() {
   if (!state || (!state.promotionsActive && !state.vouchersActive)) return null;
 
   const stickers = state.stickers || [];
+  // impression tracking
+  useEffect(()=>{
+    try{ track({ type: 'promo_impression', payload: { bannerText: state.bannerText } }); }catch(e){}
+  }, []);
+
   return (
     <div className={`w-full bg-accent/10 border-b border-borderSoft py-2`}>
       <div className="container mx-auto px-4 flex items-center justify-between text-sm">
@@ -44,7 +49,7 @@ export default function PromotionBanner() {
         <div className="flex items-center gap-3">
           {stickers.slice(0,2).map(s => (
             s.href ? (
-              <a key={s.id} href={s.href} className="inline-flex items-center justify-center" style={{ textDecoration: 'none' }}>
+              <a key={s.id} href={s.href} onClick={()=> track({ type: 'promo_click', payload: { id: s.id } })} className="inline-flex items-center justify-center" style={{ textDecoration: 'none' }}>
                 {s.imageUrl ? <img src={s.imageUrl} alt={s.text || s.id} className="h-6 w-6 object-contain" /> : (s.text || s.id)}
               </a>
             ) : (

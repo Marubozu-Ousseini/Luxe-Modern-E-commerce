@@ -201,7 +201,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ product, onAddToCart, onB
             <div className="text-lg font-semibold text-charcoal">{formatCurrency(product.price)}</div>
           </div>
           <div className="flex gap-2">
-            <button onClick={handleAddToCartClick} className="btn-primary py-3 px-4 rounded-md">Ajouter</button>
+            <button onClick={() => { track({ type: 'pdp_sticky_cta_click', payload: { productId: product.id } }); handleAddToCartClick(); }} className="btn-primary py-3 px-4 rounded-md">Ajouter</button>
             <button onClick={() => { /* open cart */ }} className="px-3 py-3 rounded-md border">Voir</button>
           </div>
         </div>

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { track } from '../services/analytics';
 import { CartIcon, SearchIcon, StoreIcon, UserIconOutline, OrdersIconOutline, HeartIconOutline, CloseIcon } from './Icons.tsx';
 import { useFavorites } from '../context/FavoritesContext.tsx';
 
@@ -67,7 +68,7 @@ const Header: React.FC<HeaderProps> = ({ onCartClick, cartItemCount, searchQuery
                 {searchQuery && (
                   <ul role="listbox" className="absolute z-50 left-0 right-0 mt-1 bg-white border border-borderSoft rounded-md shadow-md text-sm">
                     {['manteau','laine','pull','écharpe','chaussures'].filter(s=>s.includes(searchQuery.toLowerCase())).slice(0,5).map(s=> (
-                      <li key={s} onMouseDown={()=> setSearchQuery(s)} className="px-3 py-2 hover:bg-bone cursor-pointer">{s}</li>
+                      <li key={s} onMouseDown={()=> { setSearchQuery(s); track({ type: 'search_suggestion_click', payload: { query: s } }); }} className="px-3 py-2 hover:bg-bone cursor-pointer">{s}</li>
                     ))}
                     {(['manteau','laine','pull','écharpe','chaussures'].filter(s=>s.includes(searchQuery.toLowerCase())).length===0) && (
                       <li className="px-3 py-2 text-slate-500">Aucun résultat suggéré</li>
@@ -128,7 +129,7 @@ const Header: React.FC<HeaderProps> = ({ onCartClick, cartItemCount, searchQuery
           <StoreIcon className="h-5 w-5" />
           <span>Boutique</span>
         </Link>
-        <button onClick={() => { const el = document.querySelector('input[placeholder="Rechercher des produits"]') as HTMLInputElement; if (el) { el.focus(); } }} aria-label="Rechercher" className="flex flex-col items-center text-xs text-slate">
+        <button onClick={() => { const el = document.querySelector('input[placeholder="Rechercher des produits"]') as HTMLInputElement; if (el) { el.focus(); } track({ type: 'search_query', payload: { source: 'bottom_nav' } }); }} aria-label="Rechercher" className="flex flex-col items-center text-xs text-slate">
           <SearchIcon className="h-5 w-5" />
           <span>Rechercher</span>
         </button>
