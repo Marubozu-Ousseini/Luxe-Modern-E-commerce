@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { track } from '../services/analytics';
@@ -17,6 +18,10 @@ const Header: React.FC<HeaderProps> = ({ onCartClick, cartItemCount, searchQuery
   const { user, logout } = useAuth();
   const { favorites } = useFavorites();
   const [scrolled, setScrolled] = useState(false);
+  const location = useLocation();
+
+  // Consider the header as "over-hero" when on the homepage or showroom route and not scrolled
+  const isOverHero = !scrolled && (location.pathname === '/' || location.pathname.startsWith('/showroom') || location.pathname.startsWith('/galeries'));
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 32);
@@ -27,7 +32,7 @@ const Header: React.FC<HeaderProps> = ({ onCartClick, cartItemCount, searchQuery
 
   return (
     <React.Fragment>
-    <header className={`sticky top-0 z-30 transition-all duration-300 ${scrolled ? 'bg-white/85 backdrop-blur-md shadow-soft' : 'bg-white/95 backdrop-blur border-b border-borderSoft'}`}>
+    <header className={`sticky top-0 z-30 transition-all duration-300 ${scrolled ? 'bg-white/85 backdrop-blur-md shadow-soft text-charcoal border-b border-borderSoft' : (isOverHero ? 'bg-[#082a6a] text-white' : 'bg-transparent text-charcoal')}`}>
       <div className="container mx-auto px-3 sm:px-4 lg:px-8">
         <div className="flex items-center justify-between h-10 sm:h-12">
           {/* Brand */}
@@ -40,15 +45,15 @@ const Header: React.FC<HeaderProps> = ({ onCartClick, cartItemCount, searchQuery
                 className="h-6 w-auto object-contain group-hover:opacity-90"
               />
               {/* Wordmark visible on desktop and mobile */}
-              <span className="hidden sm:inline text-charcoal font-serif font-semibold tracking-tight text-sm leading-none">Malafaareh</span>
+              <span className={`hidden sm:inline font-serif font-semibold tracking-tight text-sm leading-none ${isOverHero ? 'text-white' : 'text-charcoal'}`}>Malafaareh</span>
             </Link>
           </div>
 
           {/* Primary nav */}
           <nav className="hidden md:flex items-center gap-6">
-            <Link to="/" className="text-sm text-slate hover:text-charcoal">Boutique</Link>
-            <Link to="/story" className="text-sm text-slate hover:text-charcoal">Histoire</Link>
-            <Link to="/showroom" className="text-sm text-slate hover:text-charcoal">Atelier</Link>
+            <Link to="/" className={`text-sm ${isOverHero ? 'text-white hover:text-sand' : 'text-slate hover:text-charcoal'}`}>Boutique</Link>
+            <Link to="/story" className={`text-sm ${isOverHero ? 'text-white hover:text-sand' : 'text-slate hover:text-charcoal'}`}>Histoire</Link>
+            <Link to="/showroom" className={`text-sm ${isOverHero ? 'text-white hover:text-sand' : 'text-slate hover:text-charcoal'}`}>Atelier</Link>
           </nav>
 
           {/* Search + Utility */}
@@ -56,7 +61,7 @@ const Header: React.FC<HeaderProps> = ({ onCartClick, cartItemCount, searchQuery
             <div className="w-full md:w-48 lg:w-60 relative">
               <div className="relative w-full">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <SearchIcon className="h-4 w-4 text-slate" />
+                  <SearchIcon className={`h-4 w-4 ${isOverHero ? 'text-white/90' : 'text-slate'}`} />
                 </div>
                 <input
                   type="text"
@@ -80,7 +85,7 @@ const Header: React.FC<HeaderProps> = ({ onCartClick, cartItemCount, searchQuery
             </div>
 
             <nav className="hidden md:flex items-center space-x-2">
-              <Link to="/favoris" className="relative p-2.5 sm:p-1.5 rounded-full text-slate hover:bg-bone" aria-label="Produits favoris">
+              <Link to="/favoris" className={`relative p-2.5 sm:p-1.5 rounded-full ${isOverHero ? 'text-white hover:bg-white/5' : 'text-slate hover:bg-bone'}`} aria-label="Produits favoris">
                 <HeartIconOutline className="h-6 w-6 sm:h-5 sm:w-5" />
                 {favorites.length > 0 && (
                   <span className="absolute top-0 right-0 block h-4 w-4 transform -translate-y-1/2 translate-x-1/2 rounded-full text-[10px] font-medium bg-charcoal text-white flex items-center justify-center">
@@ -88,7 +93,7 @@ const Header: React.FC<HeaderProps> = ({ onCartClick, cartItemCount, searchQuery
                   </span>
                 )}
               </Link>
-              <Link to="/orders" className="p-2.5 sm:p-1.5 rounded-full text-slate hover:bg-bone" aria-label="Mes commandes">
+              <Link to="/orders" className={`p-2.5 sm:p-1.5 rounded-full ${isOverHero ? 'text-white hover:bg-white/5' : 'text-slate hover:bg-bone'}`} aria-label="Mes commandes">
                 <OrdersIconOutline className="h-6 w-6 sm:h-5 sm:w-5" />
               </Link>
               {user?.role === 'admin' && (
@@ -96,11 +101,11 @@ const Header: React.FC<HeaderProps> = ({ onCartClick, cartItemCount, searchQuery
               )}
             </nav>
             {user ? (
-              <button onClick={logout} className="p-2.5 sm:p-1.5 rounded-full text-slate hover:bg-bone touch-manipulation" aria-label="Se déconnecter">
+              <button onClick={logout} className={`p-2.5 sm:p-1.5 rounded-full ${isOverHero ? 'text-white hover:bg-white/5' : 'text-slate hover:bg-bone'} touch-manipulation`} aria-label="Se déconnecter">
                 <CloseIcon className="h-5 w-5" />
               </button>
             ) : (
-              <Link to="/login" className="flex items-center gap-2 px-3 py-1.5 sm:px-2 sm:py-1 rounded-full text-slate hover:bg-bone touch-manipulation" aria-label="Se connecter">
+              <Link to="/login" className={`flex items-center gap-2 px-3 py-1.5 sm:px-2 sm:py-1 rounded-full touch-manipulation ${isOverHero ? 'text-white hover:bg-white/5' : 'text-slate hover:bg-bone'}`} aria-label="Se connecter">
                 <UserIconOutline className="h-6 w-6 sm:h-5 sm:w-5" />
                 <span className="text-sm">Se connecter</span>
               </Link>
@@ -111,7 +116,7 @@ const Header: React.FC<HeaderProps> = ({ onCartClick, cartItemCount, searchQuery
               aria-label="Ouvrir le panier"
             >
               <span className="sr-only">Ouvrir le panier</span>
-              <CartIcon className={`h-6 w-6 sm:h-5 sm:w-5 ${isCartAnimating ? 'cart-shake' : ''}`} />
+              <CartIcon className={`h-6 w-6 sm:h-5 sm:w-5 ${isCartAnimating ? 'cart-shake' : ''} ${isOverHero ? 'text-white' : ''}`} />
               {cartItemCount > 0 && (
                 <span className="absolute top-0 right-0 block h-4 w-4 transform -translate-y-1/2 translate-x-1/2 rounded-full text-[10px] font-medium bg-charcoal text-white flex items-center justify-center">
                   {cartItemCount}
