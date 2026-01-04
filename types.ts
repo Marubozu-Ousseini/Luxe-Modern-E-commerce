@@ -8,6 +8,10 @@ export interface Product {
   description: string;
   category: string;
   imageUrl: string;
+  /** Optional gallery images for PDP carousel */
+  images?: string[];
+  /** Optional product video for gallery */
+  videoUrl?: string;
   /** Optional available stock quantity for inventory management */
   stock?: number;
   /** Optional flag to display a neutral "Limited Availability" badge on cards */
@@ -18,6 +22,11 @@ export interface Product {
   };
   /** Optional label slugs applied to the product (managed via Admin). */
   labels?: string[];
+  /** Optional merchandising metadata for filtering */
+  materials?: string[];
+  colors?: string[];
+  sizes?: string[];
+  fit?: 'Slim' | 'Regular' | 'Relaxed';
 }
 
 export interface CartItem {

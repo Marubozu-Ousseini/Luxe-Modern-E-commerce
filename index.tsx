@@ -9,6 +9,7 @@ import App from './App.tsx';
 import Login from './pages/Login.tsx';
 import Register from './pages/Register.tsx';
 import Orders from './pages/Orders.tsx';
+import Checkout from './pages/Checkout.tsx';
 import Admin from './pages/Admin.tsx';
 import Story from './pages/Story.tsx';
 import Showroom from './pages/Showroom';
@@ -36,6 +37,7 @@ root.render(
           <Route path="/showroom" element={<Showroom />} />
           <Route path="/galeries" element={<Galeries />} />
           <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
+          <Route path="/checkout" element={<Checkout />} />
           <Route path="/admin" element={<ProtectedRoute requireAdmin><Admin /></ProtectedRoute>} />
           <Route path="/favoris" element={<Favoris />} />
         </Routes>

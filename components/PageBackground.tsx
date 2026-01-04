@@ -14,7 +14,7 @@ const PageBackground: React.FC<PageBackgroundProps> = ({ pageKey, overlayClassNa
     <div className="relative min-h-screen">
       <div aria-hidden="true" className="absolute inset-0 -z-10">
         {src ? (
-          <img src={src} alt={alt || ''} loading="lazy" className="w-full h-full object-cover" />
+          <img src={src} alt={alt || ''} loading="lazy" className="w-full h-full object-cover object-center md:object-top" />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300 animate-pulse" />
         )}

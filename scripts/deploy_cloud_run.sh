@@ -72,7 +72,9 @@ append_env STRIPE_SECRET_KEY
 append_env STRIPE_WEBHOOK_SECRET
 append_env STRIPE_CURRENCY
 
-ENV_ARG="--set-env-vars=$(IFS=','; echo "${ENV_FLAGS[*]}")"
+# Use alternative separator for --set-env-vars to avoid conflicts with commas in values
+# See: gcloud topic escaping (prefix with ^ and choose a delimiter not present in values)
+ENV_ARG="--set-env-vars=^~^$(IFS='~'; echo "${ENV_FLAGS[*]}")"
 
 echo "[deploy] Deploying Cloud Run service '${SERVICE_NAME}'..."
 gcloud run deploy "${SERVICE_NAME}" \

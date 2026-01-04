@@ -15,7 +15,7 @@
         --color-bg: #FAF8F5; /* porcelain */
         --color-text: #1C1C1C; /* charcoal */
         --color-muted: #6C6C6C;
-        --color-accent: #0078FF; /* shiny azure blue */
+        --color-accent: #0F3D3E; /* cypress green */
         --shadow-soft: 0 8px 24px rgba(0,0,0,0.06);
         --ease: cubic-bezier(0.22, 1, 0.36, 1);
       }
@@ -24,8 +24,8 @@
       h3, h4 { letter-spacing: -0.01em; }
 
       .btn-primary {
-        background: linear-gradient(135deg, #008CFF 0%, #0078FF 60%, #3FA9FF 100%);
-        color: white;
+        background: var(--color-accent);
+        color: #FFFFFF;
         padding: 0.75rem 1.25rem;
         border-radius: 0.5rem;
         box-shadow: var(--shadow-soft);
@@ -33,22 +33,22 @@
       }
       .btn-primary:hover { transform: translateY(-1px) scale(1.02); filter: saturate(1.1); }
       .btn-secondary {
-        background: white;
+        background: #FFFFFF;
         color: var(--color-accent);
         padding: 0.75rem 1.25rem;
         border-radius: 0.5rem;
-        border: 1px solid rgba(0,120,255,0.18);
+        border: 1px solid rgba(15,61,62,0.18);
         box-shadow: var(--shadow-soft);
         transition: transform 150ms var(--ease, cubic-bezier(0.22, 1, 0.36, 1)), background-color 150ms, color 150ms, border-color 150ms;
       }
       .btn-secondary:hover {
         transform: translateY(-1px) scale(1.02);
-        background-color: rgba(0,120,255,0.06);
-        border-color: rgba(0,120,255,0.28);
+        background-color: rgba(15,61,62,0.06);
+        border-color: rgba(15,61,62,0.28);
       }
       .btn-outline {
         background: transparent;
-        color: white;
+        color: #FFFFFF;
         padding: 0.75rem 1.25rem;
         border-radius: 0.5rem;
         border: 1px solid rgba(255,255,255,0.7);
@@ -81,7 +81,7 @@
       textarea:focus-visible,
       [role="button"]:focus-visible {
         outline: none;
-        box-shadow: 0 0 0 3px rgba(0, 120, 255, 0.35);
+        box-shadow: 0 0 0 3px rgba(15, 61, 62, 0.35);
         border-radius: 8px;
       }
       @keyframes shake-cart {

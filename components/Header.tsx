@@ -26,6 +26,7 @@ const Header: React.FC<HeaderProps> = ({ onCartClick, cartItemCount, searchQuery
   }, []);
 
   return (
+    <React.Fragment>
     <header className={`sticky top-0 z-30 transition-all duration-300 ${scrolled ? 'bg-white/85 backdrop-blur-md shadow-soft' : 'bg-white/95 backdrop-blur border-b border-borderSoft'}`}>
       <div className="container mx-auto px-3 sm:px-4 lg:px-8">
         <div className="flex items-center justify-between h-10 sm:h-12">
@@ -148,6 +149,7 @@ const Header: React.FC<HeaderProps> = ({ onCartClick, cartItemCount, searchQuery
         </Link>
       </div>
     </nav>
+    </React.Fragment>
   );
 };
 

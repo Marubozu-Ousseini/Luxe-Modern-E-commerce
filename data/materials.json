@@ -1,0 +1,30 @@
+[
+  {
+    "id": "cotton",
+    "name": "Coton",
+    "description": "Respirant et polyvalent. L’élégance du quotidien.",
+    "image": "https://images.pexels.com/photos/461428/pexels-photo-461428.jpeg?auto=compress&cs=tinysrgb&w=1200&q=60",
+    "alt": "Gros plan sur la texture du coton"
+  },
+  {
+    "id": "silk",
+    "name": "Soie",
+    "description": "Drapé fluide et légère brillance. Un luxe intemporel.",
+    "image": "https://images.pexels.com/photos/666442/pexels-photo-666442.jpeg?auto=compress&cs=tinysrgb&w=1200&q=60",
+    "alt": "Tissu en soie aux reflets doux"
+  },
+  {
+    "id": "leather",
+    "name": "Cuir",
+    "description": "Souple et pérenne. Pensé pour se patiner avec le temps.",
+    "image": "https://images.pexels.com/photos/2723769/pexels-photo-2723769.jpeg?auto=compress&cs=tinysrgb&w=1200&q=60",
+    "alt": "Surface de cuir avec grain naturel"
+  },
+  {
+    "id": "linen",
+    "name": "Lin",
+    "description": "Léger et texturé. Le confort estival sans effort.",
+    "image": "https://images.pexels.com/photos/14725562/pexels-photo-14725562.jpeg?auto=compress&cs=tinysrgb&w=1200&q=60",
+    "alt": "Tissu en lin montrant sa trame"
+  }
+]

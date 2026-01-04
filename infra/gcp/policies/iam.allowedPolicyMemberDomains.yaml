@@ -1,4 +1,4 @@
-name: projects/PROJECT_NUMBER/policies/iam.allowedPolicyMemberDomains
+name: projects/94961718864/policies/iam.allowedPolicyMemberDomains
 spec:
   rules:
-  - enforce: false
+  - allowAll: true

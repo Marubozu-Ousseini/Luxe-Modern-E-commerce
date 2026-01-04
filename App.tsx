@@ -7,10 +7,15 @@ import { getProducts } from './services/productService.ts';
 import Header from './components/Header.tsx';
 import ProductList from './components/ProductList.tsx';
 import CategoryFilter from './components/CategoryFilter.tsx';
+import { translate } from './src/utils/i18n.ts';
+import FilterBar, { FilterState } from './components/FilterBar.tsx';
+import { track } from './services/analytics.ts';
 import Cart from './components/Cart.tsx';
 import ProductDetail from './components/ProductDetail.tsx';
+import { usePageBackground } from './context/PromotionsContext.tsx';
 import PromoRibbon from './components/PromoRibbon.tsx';
 import AdBanner from './components/AdBanner.tsx';
+import MaterialsBand from './components/MaterialsBand.tsx';
 
 const App: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
@@ -23,31 +28,10 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isCartAnimating, setIsCartAnimating] = useState(false);
+  const [sortOrder, setSortOrder] = useState<'Curated'|'Newest'|'Price'>('Curated');
+  const [filters, setFilters] = useState<FilterState>({ materials: [], colors: [], sizes: [], fit: [] });
   // Dynamic home background from promotions + fallback chain
-  const { promotions } = usePromotions();
-  const [homeHeroSrc, setHomeHeroSrc] = useState<string | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    const cfg = promotions?.pageBackgrounds?.home;
-    if (!cfg) return;
-    const isMobile = typeof window !== 'undefined' && window.matchMedia('(max-width: 640px)').matches;
-    const candidates = [isMobile ? cfg.mobile : cfg.desktop, ...(cfg.fallback || [])].filter(Boolean) as string[];
-    if (!candidates.length) return;
-    (async () => {
-      for (const c of candidates) {
-        try {
-          await new Promise<void>((resolve, reject) => {
-            const img = new Image();
-            img.onload = () => resolve();
-            img.onerror = reject;
-            img.src = c;
-          });
-          if (!cancelled) { setHomeHeroSrc(c); break; }
-        } catch {/* next */}
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [promotions]);
+  const { src: homeHeroSrc, alt: homeHeroAlt } = usePageBackground('home');
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -66,27 +50,46 @@ const App: React.FC = () => {
     fetchProducts();
   }, []);
 
+  // Persist cart in localStorage for checkout page
+  useEffect(()=>{
+    try {
+      localStorage.setItem('cart.items', JSON.stringify(cartItems));
+    } catch {}
+  }, [cartItems]);
+
   const categories = useMemo(() => {
-    return ['Tous', 'Prêt-à-porter', 'Chaussures', 'Parfums', 'Montres', 'Accessoires'];
-  }, []);
+    const unique = Array.from(new Set(products.map(p => p.category))).filter(Boolean);
+    const items = unique.map(c => ({ value: c, label: translate('category', c) }));
+    return [{ value: 'Tous', label: 'Tous' }, ...items];
+  }, [products]);
 
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const p of products) {
-      counts[p.category] = (counts[p.category] || 0) + 1;
+      if (p.category) counts[p.category] = (counts[p.category] || 0) + 1;
     }
     counts['Tous'] = products.length;
     return counts;
   }, [products]);
 
   const filteredProducts = useMemo(() => {
-    return products
+    let list = products
       .filter(product => selectedCategory === 'Tous' || product.category === selectedCategory)
       .filter(product =>
         product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         product.description.toLowerCase().includes(searchQuery.toLowerCase())
       );
-  }, [products, selectedCategory, searchQuery]);
+    // Apply pills filters when present
+    if (filters.materials.length) list = list.filter(p => (p.materials||[]).some(m=>filters.materials.includes(m)));
+    if (filters.colors.length) list = list.filter(p => (p.colors||[]).some(c=>filters.colors.includes(c)));
+    if (filters.sizes.length) list = list.filter(p => (p.sizes||[]).some(s=>filters.sizes.includes(s)));
+    if (filters.fit.length) list = list.filter(p => p.fit && filters.fit.includes(p.fit));
+    // Sort order
+    if (sortOrder === 'Curated') list = list.sort((a,b)=> (b.rating.count||0) - (a.rating.count||0));
+    if (sortOrder === 'Newest') list = list; // placeholder; backend could include createdAt
+    if (sortOrder === 'Price') list = list.sort((a,b)=> a.price - b.price);
+    return list;
+  }, [products, selectedCategory, searchQuery, filters, sortOrder]);
 
   const handleAddToCart = useCallback((product: Product, quantity: number = 1) => {
     setCartItems(prevItems => {
@@ -184,32 +187,34 @@ const App: React.FC = () => {
             product={selectedProduct}
             onAddToCart={handleAddToCart}
             onBack={handleBackToList}
+            suggestions={products.filter(p => p.category === selectedProduct.category && p.id !== selectedProduct.id).sort((a,b)=> (b.rating.count||0)-(a.rating.count||0)).slice(0,3)}
+            onSelectProduct={(p)=> setSelectedProduct(p)}
           />
         ) : (
           <>
-            {/* Hero: full-screen width and height (minus header) */}
-            <section className="relative -mx-[50vw] left-1/2 right-1/2 w-screen mb-8 overflow-hidden">
-              <div className="relative h-[calc(100vh-4rem)] min-h-[calc(100vh-4rem)] w-full">
-                {homeHeroSrc && (
-                  <img
-                    src={homeHeroSrc}
-                    alt="Hero"
-                    className="absolute inset-0 w-full h-full object-cover"
-                  />
-                )}
+            {/* Hero: full-bleed with moderated height and subtle overlay */}
+            <section className="relative mb-8 overflow-hidden">
+              <div className="relative h-[44vh] min-h-[320px] w-full">
+                <img
+                  src={homeHeroSrc || 'https://images.pexels.com/photos/1129413/pexels-photo-1129413.jpeg?auto=compress&cs=tinysrgb&w=1600&q=60'}
+                  alt={homeHeroAlt || 'Image éditoriale saisonnière en arrière‑plan'}
+                  className="absolute inset-0 w-full h-full object-cover object-center md:object-top"
+                />
+                {/* Overlay to keep a clean porcelain backdrop regardless of image */}
+                <div className="absolute inset-0 bg-porcelain" aria-hidden="true" />
                 <div className="relative z-10 h-full flex flex-col items-center justify-center text-center px-6">
-                  <h1 className="text-4xl md:text-5xl font-serif font-semibold tracking-tight text-white">La qualité et le Luxe à votre portée</h1>
+                  <h1 className="text-4xl md:text-5xl font-serif font-semibold tracking-tight text-charcoal">La Sélection Saisonnière</h1>
                   {/* Subtitle removed per request */}
                   <div className="mt-8 flex gap-4">
                     <a
                       href="#catalogue"
                       className="btn-primary font-medium px-5 py-3"
                       aria-label="Explorer la collection"
-                    >Explorer la Collection</a>
+                    >Explorer la collection</a>
                     <Link
                       to="/story"
                       className="btn-secondary font-medium px-5 py-3 backdrop-blur-sm"
-                      aria-label="Entrer dans l'Atelier"
+                      aria-label="Entrer dans l’Atelier"
                     >
                       Entrer dans l’Atelier
                     </Link>
@@ -225,7 +230,19 @@ const App: React.FC = () => {
               onSelectCategory={setSelectedCategory}
               categoryCounts={categoryCounts}
             />
-            {/* Secondary feature links below categories */}
+            {/* PLP pill filters + sort */}
+            <div className="flex items-center justify-between mb-4">
+              <FilterBar products={products} value={filters} onChange={(next)=>{ setFilters(next); track({ type: 'plp_filter_used', payload: { materials: next.materials.length, colors: next.colors.length, sizes: next.sizes.length, fit: next.fit.length } }); }} />
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-slate-700">Tri</label>
+                <select value={sortOrder} onChange={e=>{ const v = e.target.value as any; setSortOrder(v); track({ type: 'plp_sort_changed', payload: { sort: v } }); }} className="border border-sand rounded-soft px-2 py-1 text-sm bg-white">
+                  <option value="Curated">Sélection</option>
+                  <option value="Newest">Nouveautés</option>
+                  <option value="Price">Prix</option>
+                </select>
+              </div>
+            </div>
+            {/* Guided pathways per homepage strategy */}
             <section className="mt-6 mb-8">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Link to="/showroom" className="group relative overflow-hidden rounded-lg bg-white shadow-soft border border-sand px-6 py-5 flex items-center justify-between hover:border-taupe/40">
@@ -238,6 +255,8 @@ const App: React.FC = () => {
                 </Link>
               </div>
             </section>
+            {/* Editorial: Our Materials */}
+            <MaterialsBand />
             <div id="catalogue">{renderContent()}</div>
           </>
         )}
@@ -277,6 +296,13 @@ const App: React.FC = () => {
                 </a>
               </div>
             </div>
+          </div>
+          <div className="mt-8 border-t border-borderSoft pt-6">
+            <form className="flex flex-col sm:flex-row items-center gap-3">
+              <label htmlFor="newsletter" className="text-sm text-charcoal/80">Rejoindre le Cercle</label>
+              <input id="newsletter" type="email" placeholder="Votre e-mail" className="flex-1 min-w-0 bg-white border border-borderSoft rounded-soft px-3 py-2 text-sm placeholder:textMuted focus:outline-none focus:ring-1 focus:ring-sand" />
+              <button type="submit" className="btn-secondary text-sm">S’inscrire</button>
+            </form>
           </div>
           <div className="mt-8 text-center text-charcoal/70">
             <p>&copy; {new Date().getFullYear()} Marubozu Sensei. Tous droits réservés.</p>

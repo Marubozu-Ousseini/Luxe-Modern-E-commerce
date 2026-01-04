@@ -5,7 +5,7 @@ This repo includes a minimal Firebase Hosting setup to serve the built SPA from 
 ## Prereqs
 - Firebase CLI installed: `npm i -g firebase-tools`
 - Logged in: `firebase login`
-- Firebase project exists (default set to `malafaarehfirebase2025` in `.firebaserc`).
+- Firebase project exists (default set to `malafaareh-481713` in `.firebaserc`).
   - If you prefer using the GCP project `malafaareh-481713`, run `firebase use malafaareh-481713` and ensure Firebase is enabled for that project.
 
 ## Build
@@ -16,7 +16,7 @@ npm run build:client
 
 ## Deploy
 ```bash
-firebase use malafaarehfirebase2025   # or your chosen Firebase project
+firebase use malafaareh-481713   # or your chosen Firebase project
 firebase deploy --only hosting
 ```
 

@@ -61,7 +61,7 @@ export const apiProxy = onRequest({ region: 'us-central1', cors: false, maxInsta
       return res.json(cfg);
     }
 
-    // Auth sync: verify Firebase ID token and upsert minimal user into Firestore
+    // Auth sync: prefer forwarding to backend unless Firestore is explicitly enabled
     if (req.method === 'POST' && path === '/api/auth/sync') {
       try {
         const header = req.headers['authorization'] || '';
@@ -73,22 +73,50 @@ export const apiProxy = onRequest({ region: 'us-central1', cors: false, maxInsta
           } catch {}
         }
         if (!token) return res.status(401).json({ message: 'Missing ID token' });
-        const decoded = await admin.auth().verifyIdToken(token);
-        const uid = decoded.uid;
-        const email = (decoded.email || '').toLowerCase();
-        const body = req.body || {};
-        const name = (body && body.name) || decoded.name || '';
-        const role = decoded.admin ? 'admin' : (decoded.role || 'user');
 
-        const db = admin.firestore();
-        const docRef = db.collection('users').doc(email || uid);
-        await docRef.set({ id: uid, email, name, role }, { merge: true });
+        // If Firestore path explicitly enabled, upsert minimal user there (optional)
+        if (process.env.FIRESTORE_ENABLED === 'true') {
+          const decoded = await admin.auth().verifyIdToken(token);
+          const uid = decoded.uid;
+          const email = (decoded.email || '').toLowerCase();
+          const body = req.body || {};
+          const name = (body && body.name) || decoded.name || '';
+          const role = decoded.admin ? 'admin' : (decoded.role || 'user');
 
-        // Set a non-auth cookie purely to satisfy clients expecting a cookie; actual auth uses Firebase
-        res.setHeader('Set-Cookie', 'token=firebase; Path=/; SameSite=None; Secure');
-        return res.status(200).json({ id: uid, email, name, role });
+          const db = admin.firestore();
+          const docRef = db.collection('users').doc(email || uid);
+          await docRef.set({ id: uid, email, name, role }, { merge: true });
+
+          // Set a non-auth cookie purely to satisfy clients expecting a cookie; actual auth uses Firebase
+          res.setHeader('Set-Cookie', 'token=firebase; Path=/; SameSite=None; Secure');
+          return res.status(200).json({ id: uid, email, name, role });
+        }
+
+        // Otherwise forward to backend /api/auth/sync with Google-signed Run token and original Firebase ID token
+        const targetUrl = `${PROXY_TARGET}${path}`;
+        const client = await auth.getIdTokenClient(PROXY_TARGET);
+        const tokenHeaders = await client.getRequestHeaders();
+        const headers = {
+          'content-type': req.headers['content-type'] || 'application/json',
+          accept: req.headers['accept'] || '*/*',
+          ...tokenHeaders
+        };
+        if (token) headers['x-firebase-id-token'] = token;
+        const init = {
+          method: 'POST',
+          headers,
+          body: req.rawBody ? req.rawBody : JSON.stringify(req.body || {})
+        };
+        const upstream = await fetch(targetUrl, init);
+        res.status(upstream.status);
+        upstream.headers.forEach((v, k) => {
+          if (k.toLowerCase() === 'content-length') return;
+          res.setHeader(k, v);
+        });
+        const buf = Buffer.from(await upstream.arrayBuffer());
+        return res.send(buf);
       } catch (e) {
-        logger.error('sync verify failed', e);
+        logger.error('sync forward failed', e);
         return res.status(401).json({ message: e?.message || 'Unauthorized' });
       }
     }

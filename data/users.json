@@ -243,5 +243,82 @@
     "name": "X",
     "role": "user",
     "passwordHash": "$2a$10$wT5r2GQeiSW/ULYiGbPxB.HofBz60qPEt/bstgAXOyAuTkDfUbp96"
+  },
+  {
+    "id": "1767452862432",
+    "email": "user_sii37qls3h@example.com",
+    "name": "Test User",
+    "role": "user",
+    "passwordHash": "$2a$10$XeMJIChZGQ8FYSWQnqXLnOLzpegsqbwJICRqAMOR64rDdJDG7NMs."
+  },
+  {
+    "id": "1767452872474",
+    "email": "user_sv4hqst1lyj@example.com",
+    "name": "Order User",
+    "role": "user",
+    "passwordHash": "$2a$10$sLjSWrGt96fBRCQs6LS8teHqkF8b2xR6vJ/PVwJnJn14vKyGlB.v."
+  },
+  {
+    "id": "1767454510260",
+    "email": "user_m6uj524ckmq@example.com",
+    "name": "X",
+    "role": "user",
+    "passwordHash": "$2a$10$SZh06kB7xUkQ6Ls98QwDSemlrfGbpckvCLQeU0fZahIsRWd1JqHLi"
+  },
+  {
+    "id": "1767454981707",
+    "email": "user_ix0l6hs3a0c@example.com",
+    "name": "X",
+    "role": "user",
+    "passwordHash": "$2a$10$EOsoSa7ILTonTE425xR8KumbzpJT4QeybBNdS5kE7mi35u5oVCs0."
+  },
+  {
+    "id": "1767474689908",
+    "email": "user_lonbemky7v@example.com",
+    "name": "Order User",
+    "role": "user",
+    "passwordHash": "$2a$10$Z5dL.WAPhbyrInZUFAyrg.lCY47XXsvIDDPMUlUYneZmDoFwdlTb2"
+  },
+  {
+    "id": "1767476300837",
+    "email": "user_5oydnb3sxm@example.com",
+    "name": "Order User",
+    "role": "user",
+    "passwordHash": "$2a$10$yTOGBb770/QYGqMns2B5a.y/36iSYqhgqUrzwiHB46yWR4C.mWYb."
+  },
+  {
+    "id": "1767476301180",
+    "email": "user_i34yrw1fw2i@example.com",
+    "name": "Test User",
+    "role": "user",
+    "passwordHash": "$2a$10$go8gE1.honbPTM8WWXcA5e0fWP9WKv6uMDZw.dnQGi9QJJ4qCjdFC"
+  },
+  {
+    "id": "1767532182482",
+    "email": "user_kg15y01y9k@example.com",
+    "name": "X",
+    "role": "user",
+    "passwordHash": "$2a$10$kTaG56uCHIx0THdAM/tsxux7ZXwhLTh7n82sCZkJQ0qs8xpxaaZjm"
+  },
+  {
+    "id": "1767533084932",
+    "email": "user_lm4a8ip12x@example.com",
+    "name": "Test User",
+    "role": "user",
+    "passwordHash": "$2a$10$U5aRhJroIyq.E.LTfy6Gb.rvnSIlUzu9PRUBQ7IAklT0RFt9vE0ra"
+  },
+  {
+    "id": "1767533238604",
+    "email": "admin_login_1767533238604@example.com",
+    "name": "Administrator",
+    "role": "admin",
+    "passwordHash": "$2a$10$ypdNXDskiGSxDU8V8axU0ORxCYgR8Ou0DdjgLUk0Q5zTjAi9LGaiS"
+  },
+  {
+    "id": "1767533257332",
+    "email": "user_uzlf2s2p5jd@example.com",
+    "name": "Test User",
+    "role": "user",
+    "passwordHash": "$2a$10$JPRldlAlzogzuI0W.LUNMudFyP8Ui6lg5J15Ag5l.JwA2qa24H8Ya"
   }
 ]

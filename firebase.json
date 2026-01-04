@@ -14,14 +14,26 @@
     "cleanUrls": true,
     "trailingSlash": false,
     "rewrites": [
-      { "source": "/api/**", "function": { "functionId": "apiProxy", "region": "us-central1" } },
-      { "source": "**", "destination": "/index.html" }
+      {
+        "source": "/api/**",
+        "run": {
+          "serviceId": "luxe-modern-ecommerce-api",
+          "region": "europe-west1"
+        }
+      },
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
     ],
     "headers": [
       {
         "source": "**/*.@(js|css|png|jpg|svg|woff|woff2)",
         "headers": [
-          { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=31536000, immutable"
+          }
         ]
       },
       {
@@ -34,5 +46,8 @@
         ]
       }
     ]
+  },
+  "database": {
+    "rules": "database.rules.json"
   }
 }

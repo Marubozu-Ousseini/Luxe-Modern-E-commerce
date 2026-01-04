@@ -6,7 +6,7 @@
   - Call /api/auth/me using returned cookie to verify server session
 
   Usage:
-    STAGING_BASE=https://malafaarehfirebase2025.web.app npx tsx scripts/staging_auth_flow.ts
+    STAGING_BASE=https://malafaareh-481713.web.app npx tsx scripts/staging_auth_flow.ts
 */
 
 type FirebaseConfig = {
@@ -19,7 +19,7 @@ type FirebaseConfig = {
   measurementId?: string;
 };
 
-const BASE = process.env.STAGING_BASE || 'https://malafaarehfirebase2025.web.app';
+const BASE = process.env.STAGING_BASE || 'https://malafaareh-481713.web.app';
 
 function url(p: string) {
   if (!p.startsWith('/')) p = `/${p}`;
@@ -78,7 +78,7 @@ async function main() {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${idToken}`,
+      'x-firebase-id-token': idToken,
     },
     body: JSON.stringify({ name: 'Staging Test User', idToken }),
   });
@@ -93,10 +93,11 @@ async function main() {
   console.log('[staging] Sync ok:', syncBody);
   if (!setCookie) console.warn('[staging] No set-cookie header returned from sync');
 
-  // 4) Call /api/auth/me with cookie to validate session
-  const meRes = await fetch(url('/api/auth/me'), {
-    headers: setCookie ? { Cookie: setCookie } : undefined,
-  });
+  // 4) Call /api/auth/me; prefer Authorization header, fallback to cookie if present
+  const meHeaders: Record<string, string> = {};
+  meHeaders['Authorization'] = `Bearer ${idToken}`;
+  if (setCookie) meHeaders['Cookie'] = setCookie;
+  const meRes = await fetch(url('/api/auth/me'), { headers: meHeaders });
   const meBody = await meRes.json().catch(() => ({}));
   if (!meRes.ok) {
     console.error('[staging] /me error:', meBody);

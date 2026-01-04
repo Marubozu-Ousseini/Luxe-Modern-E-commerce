@@ -20,7 +20,9 @@ module.exports = {
         slate: '#2A2A2A',
         taupe: '#8A7E72',
         sand: '#D8CFC4',
-        accent: '#0078FF',
+        accent: '#0F3D3E',
+        textMuted: '#6C6C6C',
+        borderSoft: 'rgba(0, 0, 0, 0.08)'
       },
       boxShadow: {
         soft: '0 8px 24px rgba(0,0,0,0.06)'
@@ -30,6 +32,11 @@ module.exports = {
       },
       maxWidth: {
         content: '1320px'
+      },
+      borderRadius: {
+        soft: '4px',
+        card: '8px',
+        modal: '12px'
       },
     }
   },
