@@ -1,0 +1,16 @@
+# Optional remote state backend (recommended when migrating organizations/projects)
+# 1) Create a GCS bucket in the TARGET project (unique name):
+#    gsutil mb -p <NEW_PROJECT_ID> -l <REGION> gs://<STATE_BUCKET_NAME>
+# 2) Enable bucket versioning (optional but recommended):
+#    gsutil versioning set on gs://<STATE_BUCKET_NAME>
+# 3) Copy this file to backend.tf and set bucket/prefix, then run:
+#    terraform init -migrate-state
+#
+# NOTE: Do NOT commit backend.tf with real bucket IDs if you prefer to keep state details private.
+
+terraform {
+  backend "gcs" {
+    bucket = "tfstate-<NEW_PROJECT_ID>-luxe"
+    prefix = "terraform/state"
+  }
+}
