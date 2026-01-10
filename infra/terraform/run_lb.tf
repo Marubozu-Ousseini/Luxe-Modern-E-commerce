@@ -86,11 +86,11 @@ resource "google_compute_global_forwarding_rule" "run_http_rule" {
 data "google_project" "current" {}
 
 resource "google_cloud_run_v2_service_iam_member" "api_invoker_lb_sa" {
-  name       = "projects/${var.project_id}/locations/${var.region}/services/${google_cloud_run_v2_service.api.name}"
-  role       = "roles/run.invoker"
+  name = "projects/${var.project_id}/locations/${var.region}/services/${google_cloud_run_v2_service.api.name}"
+  role = "roles/run.invoker"
   # Grant invoker to the Cloud Run serverless robot service account
   # Format: service-<PROJECT_NUMBER>@serverless-robot-prod.iam.gserviceaccount.com
-  member     = "serviceAccount:service-${data.google_project.current.number}@serverless-robot-prod.iam.gserviceaccount.com"
+  member = "serviceAccount:service-${data.google_project.current.number}@serverless-robot-prod.iam.gserviceaccount.com"
 }
 
 # Additionally grant invoker to the Google-managed L7 LB service account.
@@ -107,8 +107,8 @@ resource "google_compute_security_policy" "cloudrun_default" {
   description = "Default Cloud Armor policy for Cloud Run LB"
 
   rule {
-    action   = "allow"
-    priority = 2147483647
+    action      = "allow"
+    priority    = 2147483647
     description = "Default allow"
     match {
       versioned_expr = "SRC_IPS_V1"

@@ -214,15 +214,15 @@ resource "google_cloud_run_v2_service" "api" {
   dynamic "traffic" {
     for_each = var.enable_traffic_splitting && var.new_revision_traffic_percent < 100 ? [1] : []
     content {
-      type          = "TRAFFIC_TARGET_ALLOCATION_TYPE_REVISION"
-      revision      = google_cloud_run_v2_service.api.latest_ready_revision
-      percent       = 100 - var.new_revision_traffic_percent
+      type     = "TRAFFIC_TARGET_ALLOCATION_TYPE_REVISION"
+      revision = google_cloud_run_v2_service.api.latest_ready_revision
+      percent  = 100 - var.new_revision_traffic_percent
     }
   }
 
   lifecycle {
     ignore_changes = [
-      traffic,  # Allow manual traffic adjustments without Terraform drift
+      traffic, # Allow manual traffic adjustments without Terraform drift
     ]
   }
 
