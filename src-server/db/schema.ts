@@ -39,3 +39,10 @@ export const orderItems = pgTable('order_items', {
   quantity: integer('quantity').notNull(),
   unitPrice: integer('unit_price').notNull(),
 });
+
+export const userFavorites = pgTable('user_favorites', {
+  id: integer('id').primaryKey().notNull(),
+  userId: text('user_id').notNull(),
+  productId: integer('product_id').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});

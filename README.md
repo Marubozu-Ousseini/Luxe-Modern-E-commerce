@@ -101,6 +101,64 @@ L'architecture cible est 100% serverless pour bénéficier du modèle à la dema
     - Executer l'uptime check (`monitoring.tf`), confirmer que `db-connection-failures` reste à 0.
     - En cas de Postgres activé, lancer `gcloud run jobs execute <service>-reset-admin` pour réinitialiser l'admin.
 
+## Blue-Green Deployment Strategy
+
+### Deploying a Canary Release
+
+1. **Deploy new version without traffic:**
+   ```bash
+   cd infra/terraform
+   terraform apply \
+     -var="enable_traffic_splitting=true" \
+     -var="new_revision_traffic_percent=10" \
+     -var="revision_tag=canary"
+   ```
+
+2. **Monitor the canary revision:**
+   ```bash
+   # Check metrics
+   gcloud run services describe luxe-modern-ecommerce-api \
+     --region europe-west1 \
+     --format="value(status.traffic)"
+   
+   # View canary logs
+   gcloud logging read "resource.type=cloud_run_revision \
+     AND resource.labels.revision_name:canary" \
+     --limit 50
+   ```
+
+3. **Gradually increase traffic:**
+   ```bash
+   # 50% traffic
+   ./scripts/deploy-canary.sh <project-id> luxe-modern-ecommerce-api europe-west1 50
+   
+   # 100% traffic (promote)
+   ./scripts/promote-canary.sh <project-id>
+   ```
+
+4. **Rollback if issues detected:**
+   ```bash
+   ./scripts/rollback.sh <project-id>
+   ```
+
+### Manual Traffic Management
+
+You can also manage traffic directly with gcloud:
+
+```bash
+# Route 20% to new revision, 80% to previous
+gcloud run services update-traffic luxe-modern-ecommerce-api \
+  --region europe-west1 \
+  --to-revisions LATEST=20,PREVIOUS=80
+
+# Route all traffic to latest
+gcloud run services update-traffic luxe-modern-ecommerce-api \
+  --region europe-west1 \
+  --to-latest
+```
+
+For more details, see [infra/terraform/BLUE_GREEN_DEPLOYMENT.md](infra/terraform/BLUE_GREEN_DEPLOYMENT.md).
+
 ## Updating the Admin Password (Recommended)
 
 - Use Secret Manager to update the `admin-password` secret rather than editing files inside the container.
