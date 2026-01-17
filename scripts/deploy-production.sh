@@ -19,6 +19,13 @@ PROJECT_ID="${1:-${PROJECT_ID:-malafaareh-481713}}"
 : "${RUN_DB_MIGRATIONS:=false}"
 : "${RUN_DB_SYNC_PRODUCTS:=false}"
 
+# Runtime configuration defaults (can be overridden via env vars)
+: "${DB_INSTANCE:=luxe-postgres}"
+: "${PGUSER:=luxe_user}"
+: "${PGDATABASE:=luxe_db}"
+: "${USE_GCS_PRODUCTS:=true}"
+: "${PRODUCTS_CATALOG_OBJECT:=catalog/products.json}"
+
 ROOT_DIR="$(cd "$(dirname "$0")"/.. && pwd)"
 cd "$ROOT_DIR"
 
@@ -62,7 +69,24 @@ gcloud run deploy "${API_SERVICE_NAME}" \
   --memory=512Mi \
   --min-instances=0 \
   --max-instances=5 \
-  --set-env-vars=NODE_ENV=production \
+  --update-env-vars=NODE_ENV=production \
+  --quiet
+
+echo "[deploy] Ensuring API runtime env vars (DB + Storage + GCS catalog) ..."
+INSTANCE_CONNECTION_NAME="${INSTANCE_CONNECTION_NAME:-}"
+if [[ -z "${INSTANCE_CONNECTION_NAME}" ]]; then
+  INSTANCE_CONNECTION_NAME="$(gcloud sql instances describe "${DB_INSTANCE}" --project "${PROJECT_ID}" --format='value(connectionName)')"
+fi
+
+DEFAULT_BUCKET="${PROJECT_ID}.appspot.com"
+STORAGE_BUCKET_VALUE="${STORAGE_BUCKET:-${DEFAULT_BUCKET}}"
+FIREBASE_STORAGE_BUCKET_VALUE="${FIREBASE_STORAGE_BUCKET:-${DEFAULT_BUCKET}}"
+PRODUCTS_GCS_BUCKET_VALUE="${PRODUCTS_GCS_BUCKET:-${DEFAULT_BUCKET}}"
+
+gcloud run services update "${API_SERVICE_NAME}" \
+  --project "${PROJECT_ID}" \
+  --region "${RUN_REGION}" \
+  --update-env-vars="PGHOST=/cloudsql/${INSTANCE_CONNECTION_NAME},INSTANCE_CONNECTION_NAME=${INSTANCE_CONNECTION_NAME},PGUSER=${PGUSER},PGDATABASE=${PGDATABASE},STORAGE_BUCKET=${STORAGE_BUCKET_VALUE},FIREBASE_STORAGE_BUCKET=${FIREBASE_STORAGE_BUCKET_VALUE},USE_GCS_PRODUCTS=${USE_GCS_PRODUCTS},PRODUCTS_GCS_BUCKET=${PRODUCTS_GCS_BUCKET_VALUE},PRODUCTS_CATALOG_OBJECT=${PRODUCTS_CATALOG_OBJECT}" \
   --quiet
 
 echo "[deploy] Deploying Web via Cloud Build (${WEB_SERVICE_NAME})..."
@@ -84,7 +108,7 @@ gcloud run deploy "${WEB_SERVICE_NAME}" \
   --memory=512Mi \
   --min-instances=0 \
   --max-instances=5 \
-  --set-env-vars=NODE_ENV=production \
+  --update-env-vars=NODE_ENV=production \
   --quiet
 
 echo "[deploy] Deploying Firebase Hosting + Functions..."
