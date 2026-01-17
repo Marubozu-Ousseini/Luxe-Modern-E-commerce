@@ -31,6 +31,8 @@ function safeParseHeroImages(value: string | null): HeroImages {
 export default function AdminSettingsPage() {
   const [heroImages, setHeroImages] = useState<HeroImages>({});
   const heroImagesRef = useRef<HeroImages>({});
+  const serverHeroImagesRef = useRef<HeroImages>({});
+  const hasServerSnapshotRef = useRef(false);
   const [heroStatus, setHeroStatus] = useState<string>("");
   const [heroAuthRequired, setHeroAuthRequired] = useState(false);
 
@@ -124,7 +126,10 @@ export default function AdminSettingsPage() {
         if (!res.ok) throw new Error("load_failed");
         const data = (await res.json()) as unknown;
         if (cancelled) return;
-        updateHeroImages(() => safeParseHeroImages(JSON.stringify(data)));
+        const parsed = safeParseHeroImages(JSON.stringify(data));
+        serverHeroImagesRef.current = parsed;
+        hasServerSnapshotRef.current = true;
+        updateHeroImages(() => parsed);
       } catch {
         // ignore
       }
@@ -166,21 +171,57 @@ export default function AdminSettingsPage() {
     };
   }
 
-  async function persistHeroImages(next: HeroImages) {
+  async function persistHeroImages(next: HeroImages, opts?: { deletedKeys?: string[] }) {
     const sanitized = sanitizeHeroImages(next);
     updateHeroImages(() => sanitized);
+
     const headers = await getAdminAuthHeaders({ "Content-Type": "application/json" });
-    const res = await fetch("/api/admin/hero-images", {
+    const authHeaders = await getAdminAuthHeaders();
+
+    // Defensive: merge with latest server map to avoid accidentally wiping other keys
+    // when the initial load hasn't completed (or failed transiently).
+    let serverMap: HeroImages | null = null;
+    try {
+      const res = await fetch("/api/admin/hero-images", {
+        method: "GET",
+        headers: authHeaders,
+        credentials: "include",
+      });
+      if (res.status === 401 || res.status === 403) {
+        setHeroAuthRequired(true);
+        throw new Error("Authentification admin requise.");
+      }
+      if (res.ok) {
+        const data = (await res.json()) as unknown;
+        serverMap = safeParseHeroImages(JSON.stringify(data));
+        serverHeroImagesRef.current = serverMap;
+        hasServerSnapshotRef.current = true;
+      }
+    } catch {
+      // If we can't fetch server state and we don't have a snapshot, abort rather than risk wiping.
+      if (!hasServerSnapshotRef.current) {
+        throw new Error("Impossible de charger la configuration actuelle. Réessayez dans quelques secondes.");
+      }
+    }
+
+    const base = serverMap ?? serverHeroImagesRef.current;
+    const merged: HeroImages = { ...base, ...sanitized };
+    for (const key of opts?.deletedKeys ?? []) delete merged[key];
+    updateHeroImages(() => merged);
+
+    const putRes = await fetch("/api/admin/hero-images", {
       method: "PUT",
       headers,
       credentials: "include",
-      body: JSON.stringify(sanitized),
+      body: JSON.stringify(merged),
     });
-    if (res.status === 401 || res.status === 403) {
+    if (putRes.status === 401 || putRes.status === 403) {
       setHeroAuthRequired(true);
       throw new Error("Authentification admin requise.");
     }
-    if (!res.ok) throw new Error("save_failed");
+    if (!putRes.ok) throw new Error("save_failed");
+    serverHeroImagesRef.current = merged;
+    hasServerSnapshotRef.current = true;
   }
 
   async function onPickHeroImages(key: string, files: FileList | null) {
@@ -275,9 +316,14 @@ export default function AdminSettingsPage() {
     const existing = heroImages[key] ?? [];
     const nextList = existing.filter((_, i) => i !== index);
     const next = { ...heroImages };
-    if (nextList.length === 0) delete next[key];
-    else next[key] = nextList;
-    void persistHeroImages(next)
+    const deletedKeys: string[] = [];
+    if (nextList.length === 0) {
+      delete next[key];
+      deletedKeys.push(key);
+    } else {
+      next[key] = nextList;
+    }
+    void persistHeroImages(next, { deletedKeys })
       .then(() => setHeroStatus("Image supprimée."))
       .catch((e: any) => setHeroStatus(e?.message || "Impossible d'enregistrer."));
   }
@@ -286,7 +332,7 @@ export default function AdminSettingsPage() {
     setHeroStatus("");
     const next = { ...heroImages };
     delete next[key];
-    void persistHeroImages(next)
+    void persistHeroImages(next, { deletedKeys: [key] })
       .then(() => setHeroStatus("Images supprimées."))
       .catch((e: any) => setHeroStatus(e?.message || "Impossible d'enregistrer."));
   }

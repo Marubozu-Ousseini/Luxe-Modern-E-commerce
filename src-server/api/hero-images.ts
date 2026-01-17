@@ -8,6 +8,7 @@ const router = Router();
 router.get('/', async (_req, res) => {
   try {
     const map = await getHeroImagesMap();
+    res.setHeader('Cache-Control', 'no-store');
     return res.json(map);
   } catch (e: any) {
     logger.error('Erreur lors de la récupération des hero images:', e);

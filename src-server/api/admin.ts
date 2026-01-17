@@ -168,6 +168,7 @@ router.get('/produits', async (_req, res) => {
 router.get('/hero-images', async (_req, res) => {
   try {
     const map = await getHeroImagesMap();
+    res.setHeader('Cache-Control', 'no-store');
     return res.json(map);
   } catch (e: any) {
     // eslint-disable-next-line no-console
