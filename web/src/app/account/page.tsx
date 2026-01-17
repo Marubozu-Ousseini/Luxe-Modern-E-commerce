@@ -10,7 +10,6 @@ import { normalizeCameroonPhone } from "@/lib/phone";
 import {
   changePasswordWithReauth,
   signInEmailPassword,
-  signInGoogle,
   signUpEmailPassword,
   subscribeToAuthState,
   syncUserToServer,
@@ -107,18 +106,6 @@ export default function AccountPage() {
       router.push("/shop");
     } catch (err: any) {
       setAuthStatus(err?.message || "Inscription impossible.");
-    }
-  }
-
-  async function onGoogle() {
-    setAuthStatus("");
-    try {
-      const user = await signInGoogle();
-      await syncUserToServer(user, user.displayName ?? undefined);
-      notifyAuthChanged();
-      router.push("/shop");
-    } catch (err: any) {
-      setAuthStatus(err?.message || "Connexion Google impossible.");
     }
   }
 
@@ -355,9 +342,6 @@ export default function AccountPage() {
                 <div className="mt-6">
                   <Button type="submit" className="w-full">
                     Se connecter
-                  </Button>
-                  <Button type="button" variant="subtle" className="mt-2 w-full" onClick={() => void onGoogle()}>
-                    Continuer avec Google
                   </Button>
                 </div>
                 {authStatus ? <p className="mt-3 text-xs text-text-muted">{authStatus}</p> : null}
