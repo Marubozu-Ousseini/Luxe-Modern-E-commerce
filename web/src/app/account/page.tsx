@@ -197,9 +197,6 @@ export default function AccountPage() {
       <div className="mt-10 rounded-modal border border-border-soft bg-bg-surface p-10 shadow-soft">
         <p className="text-xs uppercase tracking-[0.12em] text-text-muted">Compte</p>
         <h1 className="mt-4 font-serif text-4xl tracking-tight-luxe">Connexion & inscription</h1>
-        <p className="mt-5 max-w-2xl text-sm leading-6 text-text-muted">
-          Connexion sécurisée avec Firebase (email/mot de passe ou Google). Après connexion, votre session est synchronisée automatiquement pour accéder à vos services.
-        </p>
 
         <div className="mt-6 overflow-hidden rounded-modal border border-border-soft bg-bg-surface shadow-soft">
           <div className="relative aspect-[21/9] bg-bg-subtle">
