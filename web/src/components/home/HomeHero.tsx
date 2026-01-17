@@ -89,7 +89,7 @@ export function HomeHero() {
   );
 
   const [override, setOverride] = useState<string[] | null>(null);
-  const [serverOverride, setServerOverride] = useState<string | null>(null);
+  const [serverOverride, setServerOverride] = useState<string[] | null>(null);
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
@@ -97,9 +97,9 @@ export function HomeHero() {
     (async () => {
       try {
         const server = await fetchHeroImagesFromServer();
-        const first = server.home?.[0];
-        if (!cancelled && typeof first === "string" && first.length > 0) {
-          setServerOverride(first);
+        const next = (server.home ?? []).filter((x) => typeof x === "string" && x.length > 0);
+        if (!cancelled && next.length > 0) {
+          setServerOverride(next);
           setIndex(0);
           return;
         }
@@ -126,7 +126,7 @@ export function HomeHero() {
   }, []);
 
   const effectiveSlides = useMemo(() => {
-    if (serverOverride) return [serverOverride];
+    if (serverOverride && serverOverride.length > 0) return serverOverride;
     if (override && override.length > 0) return override;
     return slides;
   }, [override, serverOverride, slides]);
