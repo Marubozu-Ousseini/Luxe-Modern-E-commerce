@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { getFirebaseAdmin } from '../middleware/firebaseAdminInit.js';
 import { z } from 'zod';
+import multer from 'multer';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import { isDbAvailable } from '../services/db.js';
 import {
@@ -13,6 +14,7 @@ import {
   getAllProductsAsync,
   updateProductAsync
 } from '../services/produitService.js';
+import { isProductsPersistenceAvailable } from '../services/produitService.js';
 import {
   getAllOrders,
   updateOrderStatus,
@@ -34,14 +36,154 @@ import {
   findUserByEmail,
   findUserByEmailAsync
 } from '../services/userService.js';
+import { getHeroImagesMap, setHeroImagesMap } from '../services/heroImagesGcsService.js';
 
 const router = Router();
 
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+});
+
+function resolveStorageBucketName(admin: any): string {
+  const raw = String(
+    process.env.STORAGE_BUCKET ||
+      process.env.FIREBASE_STORAGE_BUCKET ||
+      // Fall back to the same bucket used by the products catalog persistence.
+      process.env.PRODUCTS_BUCKET ||
+      process.env.PRODUCTS_GCS_BUCKET ||
+      ''
+  ).trim();
+  if (raw) {
+    // Firebase client configs sometimes use the storage API host; normalize to the actual bucket name.
+    if (raw.endsWith('.firebasestorage.app')) return raw.replace(/\.firebasestorage\.app$/, '.appspot.com');
+    if (raw.endsWith('.firebaseapp.com')) return raw.replace(/\.firebaseapp\.com$/, '.appspot.com');
+    return raw;
+  }
+
+  const projectId =
+    String(
+      process.env.GCP_PROJECT ||
+        process.env.GCLOUD_PROJECT ||
+        process.env.GOOGLE_CLOUD_PROJECT ||
+        process.env.FIREBASE_ADMIN_PROJECT_ID ||
+        process.env.FIREBASE_PROJECT_ID ||
+        process.env.FIREBASE_CLIENT_PROJECT_ID ||
+        process.env.VITE_FIREBASE_PROJECT_ID ||
+        admin?.app?.()?.options?.projectId ||
+        ''
+    ).trim();
+  if (projectId) return `${projectId}.appspot.com`;
+
+  throw new Error('STORAGE_BUCKET not configured and projectId unavailable');
+}
+
+function isDbConfigured(): boolean {
+  return Boolean(
+    (process.env.DATABASE_URL && String(process.env.DATABASE_URL).trim()) ||
+      (process.env.INSTANCE_CONNECTION_NAME && String(process.env.INSTANCE_CONNECTION_NAME).trim()) ||
+      (process.env.PGHOST && String(process.env.PGHOST).trim())
+  );
+}
+
 router.use(requireAuth, requireAdmin);
 
+// === Admin dashboard metrics ===
+router.get('/dashboard', async (_req, res) => {
+  try {
+    const now = Date.now();
+    const since = now - 7 * 24 * 60 * 60 * 1000;
+
+    const products = isProductsPersistenceAvailable() ? await getAllProductsAsync() : getAllProducts();
+    const orders = isDbAvailable() ? await getAllOrdersAsync() : getAllOrders();
+
+    const recentOrders = orders.filter((o: any) => {
+      const t = Date.parse(String(o?.createdAt || ''));
+      return Number.isFinite(t) && t >= since;
+    });
+
+    const paidRecent = recentOrders.filter((o: any) => String(o?.status || '') === 'paid');
+    const revenue7dXaf = paidRecent.reduce((sum: number, o: any) => sum + (Number(o?.total) || 0), 0);
+
+    let heroImagesPages = 0;
+    let heroImagesTotal = 0;
+    try {
+      const map = await getHeroImagesMap();
+      heroImagesPages = Object.keys(map || {}).length;
+      heroImagesTotal = Object.values(map || {}).reduce((acc, arr) => acc + (Array.isArray(arr) ? arr.length : 0), 0);
+    } catch {
+      // non-bloquant
+    }
+
+    let storageBucket: string | null = null;
+    try {
+      const admin = getFirebaseAdmin();
+      storageBucket = resolveStorageBucketName(admin);
+    } catch {
+      storageBucket = null;
+    }
+
+    return res.json({
+      generatedAt: new Date().toISOString(),
+      db: {
+        configured: isDbConfigured(),
+        available: isDbAvailable(),
+      },
+      storage: {
+        bucket: storageBucket,
+        productsPersistence: isProductsPersistenceAvailable(),
+      },
+      products: {
+        count: Array.isArray(products) ? products.length : 0,
+      },
+      orders: {
+        total: Array.isArray(orders) ? orders.length : 0,
+        last7d: paidRecent.length,
+        revenue7dXaf,
+      },
+      heroImages: {
+        pages: heroImagesPages,
+        images: heroImagesTotal,
+      },
+    });
+  } catch (e: any) {
+    // eslint-disable-next-line no-console
+    console.error('[admin dashboard] error', e);
+    return res.status(500).json({ message: 'Erreur serveur', details: String(e?.message || e) });
+  }
+});
+
 router.get('/produits', async (_req, res) => {
-  const products = isDbAvailable() ? await getAllProductsAsync() : getAllProducts();
+  const products = isProductsPersistenceAvailable() ? await getAllProductsAsync() : getAllProducts();
   return res.json(products);
+});
+
+// === Hero images (global settings) ===
+router.get('/hero-images', async (_req, res) => {
+  try {
+    const map = await getHeroImagesMap();
+    return res.json(map);
+  } catch (e: any) {
+    // eslint-disable-next-line no-console
+    console.error('[admin hero-images] error', e);
+    return res.status(500).json({ message: 'Erreur serveur', details: String(e?.message || e) });
+  }
+});
+
+router.put('/hero-images', async (req, res) => {
+  try {
+    const schema = z.record(z.string(), z.array(z.string().min(1)).max(10));
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: 'Champs invalides', details: parsed.error.flatten() });
+    }
+    await setHeroImagesMap(parsed.data);
+    return res.json({ ok: true });
+  } catch (e: any) {
+    // eslint-disable-next-line no-console
+    console.error('[admin hero-images] error', e);
+    return res.status(500).json({ message: 'Erreur serveur', details: String(e?.message || e) });
+  }
 });
 
 router.post('/produits', async (req, res) => {
@@ -57,7 +199,7 @@ router.post('/produits', async (req, res) => {
   const parse = schema.safeParse(req.body);
   if (!parse.success) return res.status(400).json({ message: 'Champs invalides', details: parse.error.flatten() });
   const { name, price, originalPrice, description, category, imageUrl, stock } = parse.data;
-  const product = isDbAvailable()
+  const product = isProductsPersistenceAvailable()
     ? await addProductAsync({ name, price, originalPrice, description, category, imageUrl, stock })
     : addProduct({ name, price, originalPrice, description, category, imageUrl, stock });
   return res.status(201).json(product);
@@ -65,14 +207,14 @@ router.post('/produits', async (req, res) => {
 
 router.put('/produits/:id', async (req, res) => {
   const id = Number(req.params.id);
-  const updated = isDbAvailable() ? await updateProductAsync(id, req.body ?? {}) : updateProduct(id, req.body ?? {});
+  const updated = isProductsPersistenceAvailable() ? await updateProductAsync(id, req.body ?? {}) : updateProduct(id, req.body ?? {});
   if (!updated) return res.status(404).json({ message: 'Produit introuvable' });
   return res.json(updated);
 });
 
 router.delete('/produits/:id', async (req, res) => {
   const id = Number(req.params.id);
-  const ok = isDbAvailable() ? await deleteProductAsync(id) : deleteProduct(id);
+  const ok = isProductsPersistenceAvailable() ? await deleteProductAsync(id) : deleteProduct(id);
   if (!ok) return res.status(404).json({ message: 'Produit introuvable' });
   return res.status(204).send();
 });
@@ -85,17 +227,56 @@ router.post('/upload-url', async (req, res) => {
     const safeName = String(filename).replace(/[^a-zA-Z0-9._-]/g, '_');
     const objectName = `admin_uploads/${Date.now()}_${Math.random().toString(36).slice(2,8)}_${safeName}`;
     const admin = getFirebaseAdmin();
-    const bucket = process.env.STORAGE_BUCKET ? admin.storage().bucket(process.env.STORAGE_BUCKET) : admin.storage().bucket();
+    const bucketName = resolveStorageBucketName(admin);
+    const bucket = admin.storage().bucket(bucketName);
     const file = bucket.file(objectName);
     // Generate a signed URL for upload (write) valid for 15 minutes
-    const [uploadUrl] = await file.getSignedUrl({ version: 'v4', action: 'write', expires: Date.now() + 15 * 60 * 1000 });
+    const [uploadUrl] = await file.getSignedUrl({
+      version: 'v4',
+      action: 'write',
+      expires: Date.now() + 15 * 60 * 1000,
+      contentType: String(contentType || 'application/octet-stream'),
+    });
     // Proxy URL for later retrieval (server will stream the object without making it public)
     const proxyUrl = `/api/admin/object/${encodeURIComponent(objectName)}`;
-    return res.json({ uploadUrl, objectName, proxyUrl });
+    const publicUrl = `/api/media/${encodeURIComponent(objectName)}`;
+    return res.json({ uploadUrl, objectName, proxyUrl, publicUrl });
   } catch (e: any) {
     // eslint-disable-next-line no-console
     console.error('[admin upload-url] error', e);
-    return res.status(500).json({ message: 'Échec de la génération de l\'URL', details: String(e) });
+    return res.status(500).json({ message: 'Échec de la génération de l\'URL', details: String(e?.message || e) });
+  }
+});
+
+// === Direct upload endpoint (fallback when signed URL generation isn't available) ===
+router.post('/upload', upload.single('file'), async (req, res) => {
+  try {
+    const fileIn = req.file;
+    if (!fileIn) return res.status(400).json({ message: 'file is required' });
+
+    const safeName = String(fileIn.originalname || 'upload').replace(/[^a-zA-Z0-9._-]/g, '_');
+    const objectName = `admin_uploads/${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${safeName}`;
+
+    const admin = getFirebaseAdmin();
+    const bucketName = resolveStorageBucketName(admin);
+    const bucket = admin.storage().bucket(bucketName);
+    const file = bucket.file(objectName);
+
+    await file.save(fileIn.buffer, {
+      resumable: false,
+      contentType: fileIn.mimetype || 'application/octet-stream',
+      metadata: {
+        cacheControl: 'public, max-age=31536000, s-maxage=31536000',
+      },
+    });
+
+    const proxyUrl = `/api/admin/object/${encodeURIComponent(objectName)}`;
+    const publicUrl = `/api/media/${encodeURIComponent(objectName)}`;
+    return res.json({ objectName, proxyUrl, publicUrl });
+  } catch (e: any) {
+    // eslint-disable-next-line no-console
+    console.error('[admin upload] error', e);
+    return res.status(500).json({ message: 'Upload serveur échoué', details: String(e?.message || e) });
   }
 });
 
@@ -105,7 +286,8 @@ router.get('/object/:name', async (req, res) => {
     const name = String(req.params.name);
     const objectName = decodeURIComponent(name);
     const admin = getFirebaseAdmin();
-    const bucket = process.env.STORAGE_BUCKET ? admin.storage().bucket(process.env.STORAGE_BUCKET) : admin.storage().bucket();
+    const bucketName = resolveStorageBucketName(admin);
+    const bucket = admin.storage().bucket(bucketName);
     const file = bucket.file(objectName);
     const [exists] = await file.exists();
     if (!exists) return res.status(404).json({ message: 'Objet introuvable' });
@@ -130,7 +312,7 @@ router.get('/object/:name', async (req, res) => {
 // === Categories endpoint (derive from existing products) ===
 router.get('/categories', async (_req, res) => {
   try {
-    const products = isDbAvailable() ? await getAllProductsAsync() : getAllProducts();
+    const products = isProductsPersistenceAvailable() ? await getAllProductsAsync() : getAllProducts();
     const cats = Array.from(new Set(products.map((p: any) => p.category).filter(Boolean)));
     return res.json(cats);
   } catch (e: any) {

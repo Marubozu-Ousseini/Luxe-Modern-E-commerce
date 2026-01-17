@@ -11,9 +11,13 @@ interface HeroSectionProps {
 const HeroSection: React.FC<HeroSectionProps> = ({ pageKey, title, description, children }) => {
   return (
     <PageBackground pageKey={pageKey} overlayClassName="bg-black/30">
-      <section className="relative mb-10 overflow-hidden">
-        <div className="relative h-[56vh] min-h-[420px] w-full flex flex-col items-center justify-center text-center px-6">
-          <h1 className="text-5xl md:text-7xl lg:text-8xl font-serif font-semibold tracking-tight leading-tight text-white">{title}</h1>
+      <section className="bg-porcelain text-center py-20">
+        <div className="container mx-auto">
+          <h1 className="text-4xl font-serif font-semibold text-charcoal mb-6">{title}</h1>
+          <div className="flex justify-center gap-4">
+            <button className="bg-blue-500 text-white px-6 py-3 rounded-md hover:bg-blue-600">Explorer la Collection</button>
+            <button className="bg-white text-blue-500 px-6 py-3 rounded-md border border-blue-500 hover:bg-blue-100">Entrer dans l'Atelier</button>
+          </div>
         </div>
       </section>
       <div className="container mx-auto max-w-content px-4 sm:px-6 lg:px-8 pb-10 text-white">

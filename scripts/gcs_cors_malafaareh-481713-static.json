@@ -1,0 +1,12 @@
+[
+  {
+    "origin": [
+      "https://malafaareh-481713.web.app",
+      "https://malafaareh.com",
+      "https://www.malafaareh.com"
+    ],
+    "method": ["GET", "HEAD", "PUT", "OPTIONS"],
+    "responseHeader": ["Content-Type", "Cache-Control", "x-goog-resumable"],
+    "maxAgeSeconds": 3600
+  }
+]

@@ -47,34 +47,35 @@ fi
 echo "[deploy] Building and pushing image via Cloud Build..."
 gcloud builds submit --tag "${IMAGE}" --quiet
 
-# Build --set-env-vars list based on available variables
-ENV_FLAGS=("NODE_ENV=production" "PORT=${PORT:-8080}")
+# Build --update-env-vars list based on available variables.
+# Important: do NOT try to set Secret Manager-backed env vars as literals (it will fail and/or overwrite secrets).
+ENV_FLAGS=("NODE_ENV=production")
 append_env() {
   local name="$1"; local val="${!1:-}"
   if [[ -n "$val" ]]; then ENV_FLAGS+=("${name}=${val}"); fi
 }
 
-append_env JWT_SECRET
 append_env ADMIN_EMAIL
-append_env ADMIN_PASSWORD
 append_env COOKIE_DOMAIN
 append_env ALLOWED_ORIGINS
 append_env FRONTEND_ORIGIN
-append_env DATABASE_URL
 append_env PGHOST
 append_env PGUSER
-append_env PGPASSWORD
 append_env PGDATABASE
 append_env PGPORT
 append_env DB_IAM_AUTH
 append_env INSTANCE_CONNECTION_NAME
-append_env STRIPE_SECRET_KEY
-append_env STRIPE_WEBHOOK_SECRET
 append_env STRIPE_CURRENCY
 
-# Use alternative separator for --set-env-vars to avoid conflicts with commas in values
-# See: gcloud topic escaping (prefix with ^ and choose a delimiter not present in values)
-ENV_ARG="--set-env-vars=^~^$(IFS='~'; echo "${ENV_FLAGS[*]}")"
+# Storage bucket overrides (uploads)
+append_env STORAGE_BUCKET
+append_env FIREBASE_STORAGE_BUCKET
+
+# Product catalog persistence (GCS JSON)
+append_env USE_GCS_PRODUCTS
+append_env PRODUCTS_BUCKET
+append_env PRODUCTS_GCS_BUCKET
+append_env PRODUCTS_CATALOG_OBJECT
 
 echo "[deploy] Deploying Cloud Run service '${SERVICE_NAME}'..."
 gcloud run deploy "${SERVICE_NAME}" \
@@ -87,8 +88,18 @@ gcloud run deploy "${SERVICE_NAME}" \
   --concurrency 80 \
   --min-instances 0 \
   --max-instances 5 \
-  ${ENV_ARG} \
   --quiet
+
+if [[ ${#ENV_FLAGS[@]} -gt 0 ]]; then
+  # Use alternative separator for --update-env-vars to avoid conflicts with commas in values
+  # See: gcloud topic escaping (prefix with ^ and choose a delimiter not present in values)
+  ENV_ARG="--update-env-vars=^~^$(IFS='~'; echo "${ENV_FLAGS[*]}")"
+  echo "[deploy] Updating non-secret env vars..."
+  gcloud run services update "${SERVICE_NAME}" \
+    --region "${RUN_REGION}" \
+    ${ENV_ARG} \
+    --quiet
+fi
 
 SERVICE_URL=$(gcloud run services describe "${SERVICE_NAME}" --region "${RUN_REGION}" --format 'value(status.url)')
 echo "[deploy] Service URL: ${SERVICE_URL}"

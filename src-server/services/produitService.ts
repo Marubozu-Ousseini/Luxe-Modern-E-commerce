@@ -3,8 +3,42 @@
 
 import type { Product } from '../../types.js'; // Types partagés (NodeNext: utiliser l'extension .js côté import)
 import { query, isDbAvailable } from './db.js';
+import {
+  addProductFs,
+  deleteProductFs,
+  getAllProductsFs,
+  getProductsFs,
+  updateProductFs,
+} from './productsFirestoreService.js';
+import {
+  addProductToCatalog,
+  deleteProductFromCatalog,
+  getAllProductsFromCatalog,
+  getProductsFromCatalog,
+  seedProductsCatalogIfMissing,
+  updateProductInCatalog,
+} from './productsGcsService.js';
 
-const products: Product[] = [
+export function isProductsPersistenceAvailable(): boolean {
+  return (
+    isDbAvailable() ||
+    process.env.USE_FIRESTORE === 'true' ||
+    process.env.USE_GCS_PRODUCTS === 'true'
+  );
+}
+
+function isSampleProductsEnabled(): boolean {
+  // By default, production must not show seeded/demo products.
+  // Enable explicitly via USE_SAMPLE_PRODUCTS=true when needed.
+  if (process.env.USE_SAMPLE_PRODUCTS === 'true') return true;
+  return process.env.NODE_ENV !== 'production';
+}
+
+function isGcsProductsEnabled(): boolean {
+  return process.env.USE_GCS_PRODUCTS === 'true';
+}
+
+const sampleProducts: Product[] = [
     {
     id: 1,
   name: 'Montre Chronographe Soul',
@@ -166,37 +200,56 @@ const products: Product[] = [
   },
 ];
 
+async function ensureGcsSeeded() {
+  if (!isGcsProductsEnabled()) return;
+  if (!isSampleProductsEnabled()) return;
+  await seedProductsCatalogIfMissing(sampleProducts);
+}
+
 /**
  * Récupère tous les produits.
  * Dans une application réelle, cette fonction interagirait avec une base de données.
  * @returns {Product[]} La liste de tous les produits.
  */
 export function getAllProducts(): Product[] {
-    // Simule un appel à la base de données
-    return products;
+  // In production, do not fall back to demo/sample products unless explicitly enabled.
+  if (!isSampleProductsEnabled()) return [];
+  return sampleProducts;
 }
 
 export async function getAllProductsAsync(): Promise<Product[]> {
-  if (!isDbAvailable()) return getAllProducts();
-  const { rows } = await query<any>('SELECT id, name, price, original_price as "originalPrice", description, category, image_url as "imageUrl", stock, limited_availability as "limitedAvailability", rating_rate as "ratingRate", rating_count as "ratingCount", labels FROM products ORDER BY id ASC');
-  return rows.map(r => ({
-    id: r.id,
-    name: r.name,
-    price: r.price,
-    originalPrice: r.originalPrice ?? undefined,
-    description: r.description,
-    category: r.category,
-    imageUrl: r.imageUrl,
-    stock: r.stock ?? 0,
-    limitedAvailability: r.limitedAvailability || undefined,
-    rating: { rate: Number(r.ratingRate || 0), count: Number(r.ratingCount || 0) },
-    labels: Array.isArray(r.labels) ? r.labels : (r.labels ? JSON.parse(r.labels) : undefined)
-  }));
+  if (isDbAvailable()) {
+    const { rows } = await query<any>('SELECT id, name, price, original_price as "originalPrice", description, category, image_url as "imageUrl", stock, limited_availability as "limitedAvailability", rating_rate as "ratingRate", rating_count as "ratingCount", labels FROM products ORDER BY id ASC');
+    return rows.map(r => ({
+      id: r.id,
+      name: r.name,
+      price: r.price,
+      originalPrice: r.originalPrice ?? undefined,
+      description: r.description,
+      category: r.category,
+      imageUrl: r.imageUrl,
+      stock: r.stock ?? 0,
+      limitedAvailability: r.limitedAvailability || undefined,
+      rating: { rate: Number(r.ratingRate || 0), count: Number(r.ratingCount || 0) },
+      labels: Array.isArray(r.labels) ? r.labels : (r.labels ? JSON.parse(r.labels) : undefined)
+    }));
+  }
+
+  if (process.env.USE_FIRESTORE === 'true') {
+    return getAllProductsFs();
+  }
+
+  if (isGcsProductsEnabled()) {
+    await ensureGcsSeeded();
+    return getAllProductsFromCatalog();
+  }
+
+  return getAllProducts();
 }
 
 export function getProducts(opts?: { q?: string; limit?: number; offset?: number }): Product[] {
   const { q, limit, offset } = opts || {};
-  let list = [...products];
+  let list = [...getAllProducts()];
   if (q) {
     const ql = q.toLowerCase();
     list = list.filter(p => p.name.toLowerCase().includes(ql) || p.description.toLowerCase().includes(ql) || p.category.toLowerCase().includes(ql));
@@ -207,109 +260,166 @@ export function getProducts(opts?: { q?: string; limit?: number; offset?: number
 }
 
 export async function getProductsAsync(opts?: { q?: string; limit?: number; offset?: number }): Promise<Product[]> {
-  if (!isDbAvailable()) return getProducts(opts);
-  const clauses: string[] = [];
-  const values: any[] = [];
-  let i = 1;
-  if (opts?.q) {
-    clauses.push('(lower(name) LIKE $' + i + ' OR lower(description) LIKE $' + i + ' OR lower(category) LIKE $' + i + ')');
-    values.push(`%${opts.q.toLowerCase()}%`);
-    i++;
+  if (isDbAvailable()) {
+    const clauses: string[] = [];
+    const values: any[] = [];
+    let i = 1;
+    if (opts?.q) {
+      clauses.push('(lower(name) LIKE $' + i + ' OR lower(description) LIKE $' + i + ' OR lower(category) LIKE $' + i + ')');
+      values.push(`%${opts.q.toLowerCase()}%`);
+      i++;
+    }
+    const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+    let sql = `SELECT id, name, price, original_price as "originalPrice", description, category, image_url as "imageUrl", stock, limited_availability as "limitedAvailability", rating_rate as "ratingRate", rating_count as "ratingCount", labels FROM products ${where} ORDER BY id ASC`;
+    if (opts?.limit) { sql += ` LIMIT $${i++}`; values.push(opts.limit); }
+    if (opts?.offset) { sql += ` OFFSET $${i++}`; values.push(opts.offset); }
+    const { rows } = await query<any>(sql, values);
+    return rows.map(r => ({
+      id: r.id,
+      name: r.name,
+      price: r.price,
+      originalPrice: r.originalPrice ?? undefined,
+      description: r.description,
+      category: r.category,
+      imageUrl: r.imageUrl,
+      stock: r.stock ?? 0,
+      limitedAvailability: r.limitedAvailability || undefined,
+      rating: { rate: Number(r.ratingRate || 0), count: Number(r.ratingCount || 0) },
+      labels: Array.isArray(r.labels) ? r.labels : (r.labels ? JSON.parse(r.labels) : undefined)
+    }));
   }
-  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
-  let sql = `SELECT id, name, price, original_price as "originalPrice", description, category, image_url as "imageUrl", stock, limited_availability as "limitedAvailability", rating_rate as "ratingRate", rating_count as "ratingCount", labels FROM products ${where} ORDER BY id ASC`; 
-  if (opts?.limit) { sql += ` LIMIT $${i++}`; values.push(opts.limit); }
-  if (opts?.offset) { sql += ` OFFSET $${i++}`; values.push(opts.offset); }
-  const { rows } = await query<any>(sql, values);
-  return rows.map(r => ({
-    id: r.id,
-    name: r.name,
-    price: r.price,
-    originalPrice: r.originalPrice ?? undefined,
-    description: r.description,
-    category: r.category,
-    imageUrl: r.imageUrl,
-    stock: r.stock ?? 0,
-    limitedAvailability: r.limitedAvailability || undefined,
-    rating: { rate: Number(r.ratingRate || 0), count: Number(r.ratingCount || 0) },
-    labels: Array.isArray(r.labels) ? r.labels : (r.labels ? JSON.parse(r.labels) : undefined)
-  }));
+
+  if (process.env.USE_FIRESTORE === 'true') {
+    return getProductsFs(opts);
+  }
+
+  if (isGcsProductsEnabled()) {
+    await ensureGcsSeeded();
+    return getProductsFromCatalog(opts);
+  }
+
+  return getProducts(opts);
 }
 
 export function addProduct(newProduct: Omit<Product, 'id' | 'rating'> & { rating?: Product['rating'] }): Product {
-  const id = Math.max(0, ...products.map(p => p.id)) + 1;
+  if (!isSampleProductsEnabled()) {
+    throw new Error('Sample products are disabled; enable persistence (DB/GCS) or set USE_SAMPLE_PRODUCTS=true for demo mode.');
+  }
+  const id = Math.max(0, ...sampleProducts.map(p => p.id)) + 1;
   const product: Product = { id, rating: newProduct.rating || { rate: 0, count: 0 }, stock: newProduct.stock ?? 0, ...newProduct };
-  products.push(product);
+  sampleProducts.push(product);
   return product;
 }
 
 export async function addProductAsync(newProduct: Omit<Product, 'id' | 'rating'> & { rating?: Product['rating'] }): Promise<Product> {
-  if (!isDbAvailable()) return addProduct(newProduct);
-  const result = await query<any>('INSERT INTO products (name, price, original_price, description, category, image_url, stock, limited_availability, rating_rate, rating_count, labels) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id', [
-    newProduct.name,
-    newProduct.price,
-    newProduct.originalPrice ?? null,
-    newProduct.description,
-    newProduct.category,
-    newProduct.imageUrl,
-    newProduct.stock ?? 0,
-    newProduct.limitedAvailability ?? false,
-    newProduct.rating?.rate ?? 0,
-    newProduct.rating?.count ?? 0,
-    JSON.stringify(newProduct.labels ?? [])
-  ]);
-  const id = result.rows[0].id;
-  return { id, rating: newProduct.rating || { rate: 0, count: 0 }, ...newProduct };
+  if (isDbAvailable()) {
+    const result = await query<any>('INSERT INTO products (name, price, original_price, description, category, image_url, stock, limited_availability, rating_rate, rating_count, labels) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id', [
+      newProduct.name,
+      newProduct.price,
+      newProduct.originalPrice ?? null,
+      newProduct.description,
+      newProduct.category,
+      newProduct.imageUrl,
+      newProduct.stock ?? 0,
+      newProduct.limitedAvailability ?? false,
+      newProduct.rating?.rate ?? 0,
+      newProduct.rating?.count ?? 0,
+      JSON.stringify(newProduct.labels ?? [])
+    ]);
+    const id = result.rows[0].id;
+    return { id, rating: newProduct.rating || { rate: 0, count: 0 }, ...newProduct };
+  }
+
+  if (process.env.USE_FIRESTORE === 'true') {
+    return addProductFs(newProduct);
+  }
+
+  if (isGcsProductsEnabled()) {
+    await ensureGcsSeeded();
+    return addProductToCatalog(newProduct);
+  }
+
+  return addProduct(newProduct);
 }
 
 export function updateProduct(id: number, updates: Partial<Omit<Product, 'id'>>): Product | undefined {
-  const idx = products.findIndex(p => p.id === id);
+  if (!isSampleProductsEnabled()) {
+    throw new Error('Sample products are disabled; enable persistence (DB/GCS) or set USE_SAMPLE_PRODUCTS=true for demo mode.');
+  }
+  const idx = sampleProducts.findIndex(p => p.id === id);
   if (idx === -1) return undefined;
-  products[idx] = { ...products[idx], ...updates };
-  return products[idx];
+  sampleProducts[idx] = { ...sampleProducts[idx], ...updates };
+  return sampleProducts[idx];
 }
 
 export async function updateProductAsync(id: number, updates: Partial<Omit<Product, 'id'>>): Promise<Product | undefined> {
-  if (!isDbAvailable()) return updateProduct(id, updates);
-  // Build dynamic SET clause
-  const fields: string[] = [];
-  const values: any[] = [];
-  let i = 1;
-  const map: Record<string, any> = {
-    name: updates.name,
-    price: updates.price,
-    original_price: updates.originalPrice,
-    description: updates.description,
-    category: updates.category,
-    image_url: updates.imageUrl,
-    stock: updates.stock,
-    limited_availability: updates.limitedAvailability,
-    labels: updates.labels ? JSON.stringify(updates.labels) : undefined,
-  };
-  for (const [col, val] of Object.entries(map)) {
-    if (val !== undefined) { fields.push(`${col}=$${i++}`); values.push(val); }
-  }
-  if (fields.length === 0) {
+  if (isDbAvailable()) {
+    // Build dynamic SET clause
+    const fields: string[] = [];
+    const values: any[] = [];
+    let i = 1;
+    const map: Record<string, any> = {
+      name: updates.name,
+      price: updates.price,
+      original_price: updates.originalPrice,
+      description: updates.description,
+      category: updates.category,
+      image_url: updates.imageUrl,
+      stock: updates.stock,
+      limited_availability: updates.limitedAvailability,
+      labels: updates.labels ? JSON.stringify(updates.labels) : undefined,
+    };
+    for (const [col, val] of Object.entries(map)) {
+      if (val !== undefined) { fields.push(`${col}=$${i++}`); values.push(val); }
+    }
+    if (fields.length === 0) {
+      const all = await getAllProductsAsync();
+      return all.find(p => p.id === id);
+    }
+    values.push(id);
+    const sql = `UPDATE products SET ${fields.join(', ')} WHERE id=$${i} RETURNING id`;
+    const res = await query<any>(sql, values);
+    if (!res.rows[0]) return undefined;
     const all = await getAllProductsAsync();
     return all.find(p => p.id === id);
   }
-  values.push(id);
-  const sql = `UPDATE products SET ${fields.join(', ')} WHERE id=$${i} RETURNING id`;
-  const res = await query<any>(sql, values);
-  if (!res.rows[0]) return undefined;
-  const all = await getAllProductsAsync();
-  return all.find(p => p.id === id);
+
+  if (process.env.USE_FIRESTORE === 'true') {
+    return updateProductFs(id, updates);
+  }
+
+  if (isGcsProductsEnabled()) {
+    await ensureGcsSeeded();
+    return updateProductInCatalog(id, updates as any);
+  }
+
+  return updateProduct(id, updates);
 }
 
 export function deleteProduct(id: number): boolean {
-  const idx = products.findIndex(p => p.id === id);
+  if (!isSampleProductsEnabled()) {
+    throw new Error('Sample products are disabled; enable persistence (DB/GCS) or set USE_SAMPLE_PRODUCTS=true for demo mode.');
+  }
+  const idx = sampleProducts.findIndex(p => p.id === id);
   if (idx === -1) return false;
-  products.splice(idx, 1);
+  sampleProducts.splice(idx, 1);
   return true;
 }
 
 export async function deleteProductAsync(id: number): Promise<boolean> {
-  if (!isDbAvailable()) return deleteProduct(id);
-  const res = await query<any>('DELETE FROM products WHERE id=$1 RETURNING id', [id]);
-  return !!res.rows[0];
+  if (isDbAvailable()) {
+    const res = await query<any>('DELETE FROM products WHERE id=$1 RETURNING id', [id]);
+    return !!res.rows[0];
+  }
+
+  if (process.env.USE_FIRESTORE === 'true') {
+    return deleteProductFs(id);
+  }
+
+  if (isGcsProductsEnabled()) {
+    await ensureGcsSeeded();
+    return deleteProductFromCatalog(id);
+  }
+
+  return deleteProduct(id);
 }

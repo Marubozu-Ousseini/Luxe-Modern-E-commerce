@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.js';
 import { isDbAvailable } from '../services/db.js';
-import { getAllProducts, getAllProductsAsync } from '../services/produitService.js';
+import { getAllProducts, getAllProductsAsync, isProductsPersistenceAvailable } from '../services/produitService.js';
 import { createOrder, getOrdersByUser, createOrderAsync, getOrdersByUserAsync } from '../services/orderService.js';
 
 const router = Router();
@@ -21,7 +21,7 @@ router.post('/', async (req, res) => {
     const paymentMethod = req.body?.paymentMethod as 'orange_money' | 'mtn_mobile_money' | 'on_delivery' | undefined;
     const couponCode = String(req.body?.couponCode || '').trim().toUpperCase() || undefined;
     if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ message: 'Panier vide' });
-    const products = isDbAvailable() ? await getAllProductsAsync() : getAllProducts();
+    const products = isProductsPersistenceAvailable() ? await getAllProductsAsync() : getAllProducts();
       const order = isDbAvailable() ? await createOrderAsync(userId, products, items, paymentMethod, couponCode) : createOrder(userId, products, items, paymentMethod, couponCode);
     return res.status(201).json(order);
   } catch (e: any) {

@@ -12,6 +12,8 @@ async function makePool(): Promise<Pool> {
     });
     return new Pool({
       ...clientOpts,
+      user: process.env.PGUSER || 'postgres',
+      password: process.env.PGPASSWORD || undefined,
       database: process.env.PGDATABASE || 'luxe_db',
     });
   }

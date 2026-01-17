@@ -3,7 +3,7 @@ import cookieParser from 'cookie-parser';
 import { logger } from '../config/logger.js';
 import { initFirebaseAdmin, getFirebaseAdmin } from '../middleware/firebaseAdminInit.js';
 import { isDbAvailable } from '../services/db.js';
-import { createUser, findUserByEmail, verifyPassword, createUserAsync, findUserByEmailAsync } from '../services/userService.js';
+import { createUser, findUserByEmail, verifyPassword, createUserAsync, findUserByEmailAsync, findUserByPhone, findUserByPhoneAsync } from '../services/userService.js';
 import { upsertFirebaseUserAsync } from '../services/userUpsert.js';
 import { signToken, cookieOptions, requireAuth } from '../middleware/auth.js';
 
@@ -14,11 +14,39 @@ router.use(cookieParser());
 
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, password, phone, town } = req.body as { name: string; email: string; password: string; phone?: string; town?: string };
-    if (!name || !email || !password) return res.status(400).json({ message: 'Champs requis manquants' });
+    const { name, email, password, phone, town } = req.body as { name: string; email?: string; password: string; phone?: string; town?: string };
+    const trimmedName = String(name || '').trim();
+    const trimmedPhone = String(phone || '').trim();
+    const trimmedTown = String(town || '').trim();
+    const trimmedEmail = String(email || '').trim();
+
+    // Backward compatible: require name + password + (phone or email)
+    if (!trimmedName || !password || (!trimmedPhone && !trimmedEmail)) {
+      return res.status(400).json({ message: 'Champs requis manquants' });
+    }
+
+    // Email is optional. If missing, generate a stable placeholder based on phone.
+    const digits = trimmedPhone.replace(/\D/g, '');
+    const baseEmail = trimmedEmail || `phone_${digits || Date.now()}@malafaareh.local`;
+    let candidateEmail = baseEmail.toLowerCase();
+    // Ensure uniqueness if placeholder collides.
+    if (isDbAvailable()) {
+      let i = 1;
+      while (await findUserByEmailAsync(candidateEmail)) {
+        candidateEmail = baseEmail.toLowerCase().replace('@', `+${i}@`);
+        i += 1;
+      }
+    } else {
+      let i = 1;
+      while (findUserByEmail(candidateEmail)) {
+        candidateEmail = baseEmail.toLowerCase().replace('@', `+${i}@`);
+        i += 1;
+      }
+    }
+
     const user = isDbAvailable()
-      ? await createUserAsync(name, email, password, 'user', phone, town)
-      : createUser(name, email, password, 'user', phone, town);
+      ? await createUserAsync(trimmedName, candidateEmail, password, 'user', trimmedPhone, trimmedTown || undefined)
+      : createUser(trimmedName, candidateEmail, password, 'user', trimmedPhone, trimmedTown || undefined);
     const token = signToken({ id: user.id, email: user.email, role: user.role });
     res.cookie('token', token, cookieOptions());
     return res.status(201).json({ id: user.id, email: user.email, name: user.name, role: user.role, phone: (user as any).phone, town: (user as any).town });
@@ -29,16 +57,21 @@ router.post('/register', async (req, res) => {
 
 router.post('/login', async (req, res) => {
   try {
-    let { email, password } = req.body as { email: string; password: string };
-    if (!email || !password) return res.status(400).json({ message: 'Champs requis manquants' });
-    email = String(email).trim();
-    const user = isDbAvailable() ? await findUserByEmailAsync(email) : findUserByEmail(email);
+    let { email, password, phone, identifier } = req.body as { email?: string; password: string; phone?: string; identifier?: string };
+    const loginKey = String(identifier || phone || email || '').trim();
+    if (!loginKey || !password) return res.status(400).json({ message: 'Champs requis manquants' });
+
+    const looksLikeEmail = loginKey.includes('@');
+    const user = looksLikeEmail
+      ? (isDbAvailable() ? await findUserByEmailAsync(loginKey) : findUserByEmail(loginKey))
+      : (isDbAvailable() ? await findUserByPhoneAsync(loginKey) : findUserByPhone(loginKey));
+
     if (!user || !verifyPassword(password, user.passwordHash)) {
       return res.status(401).json({ message: 'Identifiants invalides' });
     }
     const token = signToken({ id: user.id, email: user.email, role: user.role });
     res.cookie('token', token, cookieOptions());
-    return res.json({ id: user.id, email: user.email, name: user.name, role: user.role });
+    return res.json({ id: user.id, email: user.email, name: user.name, role: user.role, phone: (user as any).phone, town: (user as any).town });
   } catch (e: any) {
     logger.error('[auth] login failed', e?.message || e);
     return res.status(500).json({ message: 'Erreur interne du serveur' });
@@ -109,8 +142,10 @@ router.post('/sync', requireAuth, async (req, res) => {
     if (!req.user) return res.status(401).json({ message: 'Non authentifié' });
     const { id, email, role } = req.user;
     const name = (req.body?.name as string) || undefined;
+    const phone = (req.body?.phone as string) || undefined;
+    const town = (req.body?.town as string) || undefined;
 
-    const persisted = await upsertFirebaseUserAsync(id, email, name, role);
+    const persisted = await upsertFirebaseUserAsync(id, email, name, role, phone, town);
     // Issue a cookie-based JWT to allow cookie auth for subsequent server requests
     const token = signToken({ id: persisted.id, email: persisted.email, role: persisted.role });
     res.cookie('token', token, cookieOptions());

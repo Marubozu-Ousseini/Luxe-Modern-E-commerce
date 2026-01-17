@@ -1,12 +1,22 @@
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import { fileURLToPath } from 'url';
 import { query, isDbAvailable } from './db.js';
 import type { Product } from '../../types.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const dataDir = path.resolve(__dirname, '../../data');
+// Data directory selection:
+// - If DATA_DIR is provided, use it (Cloud Run writable path or mounted volume).
+// - If running in production, default to OS temp dir to avoid writing into container image layers.
+// - Otherwise (local dev), use the repository `data/` folder.
+const projectDataDir = path.resolve(process.cwd(), 'data');
+const dataDir = process.env.DATA_DIR
+  ? path.resolve(process.env.DATA_DIR)
+  : process.env.NODE_ENV === 'production'
+    ? path.resolve(os.tmpdir(), 'luxe-data')
+    : projectDataDir;
 const ordersFile = path.join(dataDir, 'orders.json');
 
 export interface OrderItem {
@@ -48,6 +58,10 @@ function writeOrders(orders: OrderRecord[]) {
 function computeCouponDiscount(subtotal: number, couponCode?: string): number {
   if (!couponCode) return 0;
   const code = couponCode.toUpperCase();
+  if (code === 'BIENVENUE10') return Math.round(subtotal * 0.10);
+  if (code === 'SPECIAL15') return Math.round(subtotal * 0.15);
+  if (code === 'LUXE20') return Math.round(subtotal * 0.20);
+  if (code === 'VIP30') return Math.round(subtotal * 0.30);
   if (code === 'SAVE10') return Math.round(subtotal * 0.10);
   if (code === 'SAVE20') return Math.round(subtotal * 0.20);
   if (code.startsWith('GIFT-')) return Math.min(subtotal, 1000);

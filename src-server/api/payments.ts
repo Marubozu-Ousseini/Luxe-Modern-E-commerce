@@ -2,7 +2,7 @@ import express, { Router } from 'express';
 import Stripe from 'stripe';
 import { isDbAvailable } from '../services/db.js';
 import { normalizeXafToCurrency } from '../utils/currency.js';
-import { getAllProducts, getAllProductsAsync } from '../services/produitService.js';
+import { getAllProducts, getAllProductsAsync, isProductsPersistenceAvailable } from '../services/produitService.js';
 import { createOrderAsync, updateOrderStatusAsync } from '../services/orderService.js';
 
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || '';
@@ -22,7 +22,7 @@ paymentsRouter.post('/checkout-session', async (req, res) => {
     if (!userId) return res.status(401).json({ message: 'Non authentifié' });
     const items = req.body?.items as { productId: number; quantity: number }[];
     if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ message: 'Panier vide' });
-    const products = isDbAvailable() ? await getAllProductsAsync() : getAllProducts();
+    const products = isProductsPersistenceAvailable() ? await getAllProductsAsync() : getAllProducts();
     // Create order locally (paid for now to reuse, or you can implement pending variant)
     const order = await createOrderAsync(userId, products, items);
     const lineItems = items.map(it => {

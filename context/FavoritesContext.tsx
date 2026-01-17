@@ -93,14 +93,16 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [user]);
 
   const toggleFavorite = useCallback((id: number) => {
-    // Optimistic local change immediately
-    setFavorites(prev => prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id]);
-    // Record desired final state
-    const nextLocal = favorites.includes(id) ? false : true;
-    pendingDesiredRef.current.set(id, nextLocal);
+    // Optimistic local change + compute desired state from the latest value
+    setFavorites((prev) => {
+      const shouldBeFav = !prev.includes(id);
+      pendingDesiredRef.current.set(id, shouldBeFav);
+      return shouldBeFav ? [...prev, id] : prev.filter((f) => f !== id);
+    });
+
     // If user authenticated, schedule batch flush
-    scheduleFlush();
-  }, [favorites, scheduleFlush, user]);
+    if (user) scheduleFlush();
+  }, [scheduleFlush, user]);
 
   // On login load remote favorites (override local) if possible
   useEffect(() => {

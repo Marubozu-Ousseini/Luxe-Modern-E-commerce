@@ -15,12 +15,21 @@ async function buildPool() {
       });
       pool = new Pool({
         ...opts,
+        user: process.env.PGUSER || 'postgres',
+        password: process.env.PGPASSWORD || undefined,
         database: process.env.PGDATABASE || 'luxe_db',
       });
+      return;
     } catch (e) {
-      console.warn('[db] IAM auth requested but @google-cloud/cloud-sql-connector not available, falling back to socket/password:', (e as Error).message);
+      console.warn(
+        '[db] IAM auth requested but Cloud SQL connector init failed, falling back to socket/password:',
+        (e as Error).message
+      );
+      // fallthrough to DATABASE_URL / PG* envs below
     }
-  } else if (databaseUrl) {
+  }
+
+  if (databaseUrl) {
     pool = new Pool({ connectionString: databaseUrl });
   } else {
     pool = new Pool({

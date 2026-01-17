@@ -320,5 +320,12 @@
     "name": "Test User",
     "role": "user",
     "passwordHash": "$2a$10$JPRldlAlzogzuI0W.LUNMudFyP8Ui6lg5J15Ag5l.JwA2qa24H8Ya"
+  },
+  {
+    "id": "1768062306886",
+    "email": "user_e7axubliqnj@example.com",
+    "name": "Order User",
+    "role": "user",
+    "passwordHash": "$2a$10$KuGnGKiRh9uHaeMwar18Ou6HbxvRi2Cg1PaFCD7qsu9rRFOUAGUN2"
   }
 ]

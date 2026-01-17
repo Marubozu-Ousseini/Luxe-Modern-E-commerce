@@ -14,13 +14,4 @@ fi
 echo "[smoke] Checking health endpoint..."
 curl -sSf "${SERVICE_URL}/health" && echo " [OK]"
 
-echo "[smoke] Fetching homepage..."
-HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' "${SERVICE_URL}")
-echo "[smoke] Homepage HTTP ${HTTP_CODE}"
-
-if [[ "${HTTP_CODE}" != "200" ]]; then
-  echo "[smoke] Unexpected homepage status. Check logs: gcloud run services logs tail ${SERVICE_NAME} --region ${RUN_REGION}" >&2
-  exit 2
-fi
-
-echo "[smoke] Success: ${SERVICE_URL} is serving client and /health is OK"
+echo "[smoke] Success: ${SERVICE_URL}/health is OK"

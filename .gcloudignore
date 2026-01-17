@@ -1,0 +1,31 @@
+# Reduce Cloud Build upload size; based on .gitignore
+.git/
+.github/
+.vscode/
+.idea/
+.DS_Store
+
+# Dependencies/build outputs
+**/node_modules/
+dist/
+dist-ssr/
+**/.next/
+**/.vercel/
+
+# Logs
+logs/
+**/*.log
+
+# Env/secrets
+.env
+.env.*
+**/*firebase-admin-key*.json
+**/*service-account*.json
+
+# Terraform
+infra/terraform/**/.terraform/
+**/*.tfstate*
+
+# Large/irrelevant
+archive/
+._incoming/

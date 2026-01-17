@@ -34,6 +34,8 @@ interface UserRecord {
   email: string;
   name?: string;
   role: 'user' | 'admin';
+  phone?: string;
+  town?: string;
   rewardsPoints?: number;
   vouchers?: { code: string; amount?: number; expiresAt?: string; createdAt: string }[];
 }
@@ -178,7 +180,7 @@ const AdminPage: React.FC = () => {
 
   useEffect(() => { fetchProducts(); }, [search, page]);
   useEffect(() => { if (tab === 'orders') fetchOrders(); }, [tab]);
-  useEffect(() => { if (tab === 'customers') fetchUsers(); }, [tab]);
+  useEffect(() => { if (tab === 'customers') { fetchUsers(); fetchOrders(); } }, [tab]);
   useEffect(() => { if (tab === 'payments') fetchPayments(); }, [tab]);
   useEffect(() => { if (tab === 'promos') fetchPromos(); }, [tab]);
   useEffect(() => { if (tab === 'ads') fetchPromos(); }, [tab]);
@@ -199,21 +201,23 @@ const AdminPage: React.FC = () => {
 
   // Upload helper: request signed upload URL, PUT file, return proxy URL
   const uploadFile = async (file: File) => {
-    // Request signed upload URL from server
-    const res = await fetch(apiUrl('/api/admin/upload-url'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ filename: file.name, contentType: file.type }),
-    });
-    if (!res.ok) throw new Error('Failed to get upload URL');
-    const data = await res.json();
-    const uploadUrl: string = data.uploadUrl;
-    const proxyUrl: string = data.proxyUrl;
-    // Upload the file directly to the signed URL
-    const putRes = await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file });
-    if (!putRes.ok) throw new Error('Upload failed');
-    return proxyUrl;
+    const uploadViaServer = async () => {
+      const form = new FormData();
+      form.append('file', file);
+      const res = await fetch(apiUrl('/api/admin/upload'), {
+        method: 'POST',
+        credentials: 'include',
+        body: form,
+      });
+      if (!res.ok) throw new Error('Upload failed');
+      const body = await res.json().catch(() => null);
+      const proxyUrl: string = String(body?.proxyUrl || '');
+      if (!proxyUrl) throw new Error('Upload failed');
+      return proxyUrl;
+    };
+
+    // Always use same-origin server upload to avoid browser CORS preflights on signed PUT URLs.
+    return await uploadViaServer();
   };
 
   // Actions
@@ -289,6 +293,20 @@ const AdminPage: React.FC = () => {
     if (!res.ok) { setError("Mise à jour du rôle échouée"); return; }
     fetchUsers();
   };
+
+  const customerOrderStats = useMemo(() => {
+    const map = new Map<string, { count: number; total: number; lastOrderAt?: string }>();
+    for (const o of orders) {
+      const rec = map.get(o.userId) || { count: 0, total: 0, lastOrderAt: undefined };
+      rec.count += 1;
+      rec.total += Number(o.total) || 0;
+      if (!rec.lastOrderAt || new Date(o.createdAt).getTime() > new Date(rec.lastOrderAt).getTime()) {
+        rec.lastOrderAt = o.createdAt;
+      }
+      map.set(o.userId, rec);
+    }
+    return map;
+  }, [orders]);
 
   // Rewards & Vouchers actions
   const grantPoints = async (email: string) => {
@@ -628,25 +646,60 @@ const AdminPage: React.FC = () => {
 
         {tab === 'customers' && (
           <div className="bg-white/95 text-charcoal p-6 rounded shadow">
-            <h2 className="font-semibold mb-4">Clients ({users.length})</h2>
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <h2 className="font-semibold mb-4">Clients ({users.length})</h2>
+              <button
+                onClick={() => {
+                  const rows = users.map((u) => {
+                    const stats = customerOrderStats.get(u.id);
+                    return {
+                      id: u.id,
+                      name: u.name || '',
+                      phone: u.phone || '',
+                      town: u.town || '',
+                      email: u.email || '',
+                      role: u.role,
+                      ordersCount: stats?.count || 0,
+                      ordersTotalXaf: stats?.total || 0,
+                      lastOrderAt: stats?.lastOrderAt || '',
+                    };
+                  });
+                  downloadCsv('customers.csv', rows, ['id','name','phone','town','email','role','ordersCount','ordersTotalXaf','lastOrderAt']);
+                }}
+                className="px-3 py-2 border rounded text-sm"
+              >Exporter (CSV)</button>
+            </div>
             {userLoading ? <div>Chargement...</div> : (
               <table className="w-full text-left">
                 <thead>
-                  <tr className="border-b"><th className="py-2">Email</th><th>Nom</th><th>Rôle</th></tr>
+                  <tr className="border-b">
+                    <th className="py-2">Téléphone</th>
+                    <th>Nom</th>
+                    <th>Ville</th>
+                    <th>Commandes</th>
+                    <th>Total</th>
+                    <th>Dernière</th>
+                    <th>Rôle</th>
+                  </tr>
                 </thead>
                 <tbody>
                   {users.map(u => (
                     <tr key={u.id} className="border-b">
-                      <td className="py-2">{u.email}</td>
+                      <td className="py-2">{u.phone || '-'}</td>
                       <td>
                         <div className="flex flex-col">
                           <span>{u.name || '-'}</span>
+                          <span className="text-xs text-gray-500">Email: {u.email || '-'}</span>
                           <span className="text-xs text-gray-500">Points: {u.rewardsPoints ?? 0}</span>
                           {u.vouchers && u.vouchers.length > 0 && (
                             <span className="text-xs text-gray-500">Bons: {u.vouchers.length}</span>
                           )}
                         </div>
                       </td>
+                      <td className="text-sm">{u.town || '-'}</td>
+                      <td className="text-sm">{customerOrderStats.get(u.id)?.count ?? 0}</td>
+                      <td className="text-sm">{(customerOrderStats.get(u.id)?.total ?? 0).toLocaleString()} XAF</td>
+                      <td className="text-sm">{customerOrderStats.get(u.id)?.lastOrderAt ? new Date(customerOrderStats.get(u.id)!.lastOrderAt!).toLocaleString() : '-'}</td>
                       <td>
                         <select className="border rounded px-2 py-1" value={u.role} onChange={e => changeUserRole(u.email, e.target.value as 'user' | 'admin')}>
                           <option value="user">user</option>

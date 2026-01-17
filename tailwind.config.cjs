@@ -14,6 +14,10 @@ module.exports = {
         sans: ['Inter', 'system-ui', 'Avenir', 'Helvetica', 'Arial', 'sans-serif']
       },
       colors: {
+        blue: {
+          500: '#082a6a',
+          600: '#061f4a'
+        },
         porcelain: '#FAF8F5',
         bone: '#F2EEE8',
         charcoal: '#1C1C1C',

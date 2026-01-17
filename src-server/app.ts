@@ -18,6 +18,9 @@ import promotionsRoutes from './api/promotions.js';
 import cartRoutes from './api/cart.js';
 import favoritesRoutes from './api/favorites.js';
 import proxyRoutes from './api/proxy.js';
+import heroImagesRoutes from './api/hero-images.js';
+import mediaRoutes from './api/media.js';
+import { isDbAvailable } from './services/db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -101,6 +104,14 @@ const apiLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
 app.use('/api', apiLimiter);
 
 app.get('/health', (_req, res) => res.status(200).send('OK'));
+app.get('/api/health', (_req, res) => {
+  const dbConfigured = Boolean(
+    process.env.DATABASE_URL ||
+      process.env.PGHOST ||
+      (process.env.DB_IAM_AUTH === 'true' && process.env.INSTANCE_CONNECTION_NAME)
+  );
+  return res.status(200).json({ ok: true, dbConfigured, dbAvailable: isDbAvailable() });
+});
 app.use('/api/produits', productRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/orders', orderRoutes);
@@ -109,6 +120,8 @@ app.use('/api/payments', paymentsRoutes);
 app.use('/api/promotions', promotionsRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/favorites', favoritesRoutes);
+app.use('/api/hero-images', heroImagesRoutes);
+app.use('/api/media', mediaRoutes);
 app.use('/proxy', proxyRoutes);
 
 // Static file handler moved to the end, after all API routes

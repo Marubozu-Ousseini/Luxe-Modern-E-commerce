@@ -12,18 +12,19 @@ function withAuthHeaders(init: RequestInit = {}) {
   return { ...init, headers, credentials: 'include' } as RequestInit;
 }
 
-export async function login(email: string, password: string) {
+export async function login(identifier: string, password: string) {
   const res = await fetch(apiUrl('/api/auth/login'), withAuthHeaders({
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password })
+    body: JSON.stringify({ identifier, password })
   }));
   if (!res.ok) throw new Error('Identifiants invalides');
   return res.json();
 }
 
-export async function register(name: string, email: string, password: string, phone?: string, town?: string) {
-  const payload: any = { name, email, password };
+export async function register(name: string, phone: string, password: string, email?: string, town?: string) {
+  const payload: any = { name, password, phone };
+  if (email) payload.email = email;
   if (phone) payload.phone = phone;
   if (town) payload.town = town;
   const res = await fetch(apiUrl('/api/auth/register'), withAuthHeaders({

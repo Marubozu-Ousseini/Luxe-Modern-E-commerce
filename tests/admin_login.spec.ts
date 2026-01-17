@@ -26,5 +26,12 @@ describe('Admin login flow', () => {
       .set('Cookie', cookie);
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
+
+    const dashRes = await request(app)
+      .get('/api/admin/dashboard')
+      .set('Cookie', cookie);
+    expect(dashRes.status).toBe(200);
+    expect(dashRes.body).toHaveProperty('orders');
+    expect(dashRes.body).toHaveProperty('products');
   });
 });

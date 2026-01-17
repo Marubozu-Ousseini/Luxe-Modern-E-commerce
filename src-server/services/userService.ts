@@ -40,6 +40,8 @@ export interface UserRecord {
   name: string;
   role: Role;
   passwordHash: string;
+  phone?: string;
+  town?: string;
   rewardsPoints?: number;
   vouchers?: Voucher[];
   favorites?: number[]; // product IDs favored by user (FS persistence)
@@ -88,6 +90,15 @@ export function findUserByEmail(email: string): UserRecord | undefined {
     throw new Error('Use findUserByEmailAsync when DB is enabled');
   }
   return readUsers().find(u => u.email.toLowerCase() === email.toLowerCase());
+}
+
+export function findUserByPhone(phone: string): UserRecord | undefined {
+  if (isDbAvailable()) {
+    throw new Error('Use findUserByPhoneAsync when DB is enabled');
+  }
+  const normalized = String(phone || '').trim();
+  if (!normalized) return undefined;
+  return readUsers().find(u => String((u as any).phone || '').trim() === normalized);
 }
 
 export function findUserById(id: string): UserRecord | undefined {
@@ -215,6 +226,21 @@ export async function findUserByEmailAsync(email: string): Promise<UserRecord | 
   }
   if (!isDbAvailable()) return findUserByEmail(email);
   const { rows } = await query<UserRecord>('SELECT id, email, name, role, password_hash as "passwordHash", phone, town, cart FROM users WHERE lower(email)=lower($1) LIMIT 1', [email]);
+  return rows[0];
+}
+
+export async function findUserByPhoneAsync(phone: string): Promise<UserRecord | undefined> {
+  if (process.env.USE_FIRESTORE === 'true') {
+    // Firestore mode uses email doc ids; phone lookup not indexed here.
+    return undefined;
+  }
+  if (!isDbAvailable()) return findUserByPhone(phone);
+  const normalized = String(phone || '').trim();
+  if (!normalized) return undefined;
+  const { rows } = await query<UserRecord>(
+    'SELECT id, email, name, role, password_hash as "passwordHash", phone, town, cart FROM users WHERE phone=$1 LIMIT 1',
+    [normalized]
+  );
   return rows[0];
 }
 

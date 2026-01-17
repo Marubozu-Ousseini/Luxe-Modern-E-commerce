@@ -36,3 +36,10 @@ drizzle/migrations
 .terraform/
 .terraform/
 cookie.txt
+
+# Local Firebase cache
+.firebase/
+
+# Local scratch/temp
+tmp/
+._incoming/

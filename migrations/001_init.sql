@@ -39,7 +39,3 @@ CREATE TABLE IF NOT EXISTS order_items (
   price INTEGER NOT NULL
 );
 
--- Seed sample products if table empty
-INSERT INTO products (name, price, original_price, description, category, image_url, stock, limited_availability, rating_rate, rating_count)
-SELECT 'Montre Chronographe Soul', 199000, 225000, 'Montre élégante pour un style soul.', 'Montres', 'https://picsum.photos/seed/guitar/600/600', 10, FALSE, 4.7, 130
-WHERE NOT EXISTS (SELECT 1 FROM products);

@@ -7,10 +7,6 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")"/.. && pwd)"
 cd "$ROOT_DIR"
 
-# Ensure build exists for hosting
-npm ci
-npm run build:client
-
 # Deploy hosting and functions
 npx firebase use
 npx firebase deploy --only hosting,functions

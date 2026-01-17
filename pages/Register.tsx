@@ -17,7 +17,7 @@ const RegisterPage: React.FC = () => {
     e.preventDefault();
     setError(null);
       try {
-      await register(name, email, password, phone, town);
+      await register(name, phone, password, email || undefined, town || undefined);
       navigate('/');
     } catch (err: any) {
       setError(err?.message || "Erreur d'inscription");
@@ -31,9 +31,9 @@ const RegisterPage: React.FC = () => {
         {error && <div className="mb-4 text-red-500">{error}</div>}
         <form onSubmit={handleSubmit} className="space-y-4">
           <input value={name} onChange={e => setName(e.target.value)} placeholder="Nom" className="w-full px-3 py-2 border rounded" />
-          <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" className="w-full px-3 py-2 border rounded" />
-          <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="Téléphone" className="w-full px-3 py-2 border rounded" />
+          <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="Téléphone" className="w-full px-3 py-2 border rounded" required />
           <input value={town} onChange={e => setTown(e.target.value)} placeholder="Ville" className="w-full px-3 py-2 border rounded" />
+          <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email (optionnel)" className="w-full px-3 py-2 border rounded" />
           <PasswordToggle value={password} onChange={e => setPassword(e.target.value)} placeholder="Mot de passe" className="w-full px-3 py-2 border rounded" />
           <button className="w-full btn-primary py-2.5">Créer un compte</button>
         </form>

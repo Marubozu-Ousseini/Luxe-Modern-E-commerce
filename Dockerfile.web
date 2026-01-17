@@ -1,0 +1,36 @@
+# Multi-stage Dockerfile for Next.js (Cloud Run)
+
+FROM node:20-alpine AS deps
+WORKDIR /app
+RUN apk add --no-cache libc6-compat
+
+COPY web/package*.json ./
+RUN npm install
+
+FROM node:20-alpine AS builder
+WORKDIR /app
+ENV NODE_ENV=production
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY web/ ./
+
+# Build Next.js app (expects output: 'standalone')
+RUN npm run build
+
+FROM node:20-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT=8080
+
+RUN addgroup -g 1001 nodegrp && adduser -D -u 1001 -G nodegrp nodeusr
+
+# Standalone server
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/public ./public
+
+USER 1001
+EXPOSE 8080
+
+# In standalone output, server.js is at project root
+CMD ["node", "server.js"]

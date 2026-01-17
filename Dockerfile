@@ -12,8 +12,8 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# Build artifacts (client + server)
-RUN npm run build:client && npm run build:server
+# Build artifacts (server only)
+RUN npm run build:server
 
 # 2) Runtime stage
 FROM node:20-alpine AS runner
@@ -24,6 +24,7 @@ RUN addgroup -g 1001 nodegrp && adduser -D -u 1001 -G nodegrp nodeusr
 COPY package*.json ./
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/migrations ./dist/migrations
 
 # Remove dev deps (already pruned by using production env if needed)
 RUN npm prune --production && npm cache clean --force

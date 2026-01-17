@@ -14,7 +14,9 @@ export function cookieOptions() {
   return {
     httpOnly: true,
     sameSite,
-    secure: true,
+    // Browsers will ignore Set-Cookie with Secure over http://localhost.
+    // Keep Secure enabled in production where HTTPS is expected.
+    secure: isProd,
     domain: COOKIE_DOMAIN,
   };
 }
@@ -33,7 +35,21 @@ declare global {
   }
 }
 
-export function requireAuth(req: Request, res: Response, next: NextFunction) {
+function getAdminEmails(): Set<string> {
+  const emails: string[] = [];
+
+  // Back-compat defaults for this project (can be overridden/extended by env vars)
+  emails.push('admin@malafaareh.com');
+  emails.push('admin@malafaareh');
+
+  if (process.env.ADMIN_EMAIL) emails.push(process.env.ADMIN_EMAIL);
+  if (process.env.ADMIN_EMAILS) {
+    emails.push(...process.env.ADMIN_EMAILS.split(',').map((s) => s.trim()).filter(Boolean));
+  }
+  return new Set(emails.map((e) => e.toLowerCase()));
+}
+
+export async function requireAuth(req: Request, res: Response, next: NextFunction) {
   try {
     // Prefer Firebase ID token forwarded by Cloud Functions proxy
     const forwarded = (req.headers['x-firebase-id-token'] || '') as string;
@@ -48,19 +64,17 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
         initFirebaseAdmin();
         const admin = getFirebaseAdmin();
         if (admin && admin.auth) {
-          return admin.auth().verifyIdToken(candidateToken)
-            .then((decoded: any) => {
-              // Map Firebase token to our AuthUser shape. We prefer role from custom claims.
-              const role = decoded?.admin || decoded?.role ? (decoded.admin ? 'admin' : (decoded.role || 'user')) : 'user';
-              req.user = { id: decoded.uid, email: decoded.email || '', role } as AuthUser;
-              return next();
-            })
-            .catch(() => {
-              // If Firebase verification fails, fallthrough to cookie-based JWT below
-            });
+          const decoded: any = await admin.auth().verifyIdToken(candidateToken);
+          const email = String(decoded?.email || '').toLowerCase();
+          const adminEmails = getAdminEmails();
+          const isAdminByEmail = email && adminEmails.has(email);
+          const isAdminByClaims = decoded?.admin === true || decoded?.role === 'admin' || decoded?.role === true;
+          const role: AuthUser['role'] = isAdminByClaims || isAdminByEmail ? 'admin' : 'user';
+          req.user = { id: String(decoded?.uid || ''), email: String(decoded?.email || ''), role } as AuthUser;
+          return next();
         }
-      } catch (e) {
-        // ignore firebase errors and fall back to cookie JWT
+      } catch {
+        // If Firebase verification fails, fall through to cookie-based JWT below
       }
     }
 
@@ -68,8 +82,8 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
     if (!token) return res.status(401).json({ message: 'Non authentifié' });
     const payload = jwt.verify(token, JWT_SECRET) as AuthUser;
     req.user = payload;
-    next();
-  } catch (e) {
+    return next();
+  } catch {
     return res.status(401).json({ message: 'Jeton invalide' });
   }
 }

@@ -65,14 +65,6 @@ steps:
         fi
 
   - name: 'node:20'
-    id: 'Build client bundle'
-    entrypoint: 'bash'
-    args:
-      - '-c'
-      - |
-        npm run build:client
-
-  - name: 'node:20'
     id: 'Build server bundle'
     entrypoint: 'bash'
     args:
@@ -86,12 +78,7 @@ steps:
     args:
       - '-c'
       - |
-        if [ "$_DEPLOY_STATIC" = "true" ] && [ -n "$_STATIC_BUCKET" ]; then
-          echo "Uploading SPA to gs://$_STATIC_BUCKET"
-          gsutil -m rsync -r dist/client gs://$_STATIC_BUCKET
-        else
-          echo "Skipping static upload"
-        fi
+        echo "Static upload is disabled: frontend is served by Cloud Run (web) via Firebase Hosting rewrites."
 
   - name: 'gcr.io/kaniko-project/executor:latest'
     id: 'Build & push image'
@@ -131,7 +118,6 @@ steps:
             --platform managed \
             --no-allow-unauthenticated \
             --service-account=cloud-run-runtime@$_PROJECT_ID.iam.gserviceaccount.com \
-            --impersonate-service-account=cloud-run-runtime@$_PROJECT_ID.iam.gserviceaccount.com \
             --concurrency=80 \
             --cpu=1 \
             --memory=512Mi \

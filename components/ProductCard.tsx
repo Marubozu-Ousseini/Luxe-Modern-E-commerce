@@ -2,7 +2,7 @@ import React from 'react';
 import { Product } from '../types.ts';
 import { usePromotions } from '../context/PromotionsContext.tsx';
 import { useFavorites } from '../context/FavoritesContext.tsx';
-import { CartIcon, HeartIcon } from './Icons.tsx';
+import { CartIcon, HeartIcon, HeartIconOutline } from './Icons.tsx';
 import Badges from './Badges.tsx';
 import { formatCurrency } from '../src/utils/formatter.ts';
 
@@ -44,9 +44,14 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onSelect, onAddToCar
           <button
             onClick={(e) => { e.stopPropagation(); toggleFavorite(product.id); }}
             aria-label={fav ? 'Retirer des favoris' : 'Ajouter aux favoris'}
-            className={`h-11 w-11 sm:h-9 sm:w-9 rounded-full flex items-center justify-center shadow-sm transition-colors backdrop-blur bg-white/85 border ${fav ? 'border-accent text-accent heart-pop' : 'border-gray-200 text-slate-600'} hover:border-accent hover:text-accent`}
+            aria-pressed={fav}
+            className={`h-11 w-11 sm:h-9 sm:w-9 rounded-full flex items-center justify-center shadow-sm transition-colors backdrop-blur bg-white/85 border ${fav ? 'border-red-500 text-red-500 heart-pop' : 'border-gray-200 text-slate-600'} hover:border-red-500 hover:text-red-500`}
           >
-            <HeartIcon className={`h-5 w-5 transition-transform ${fav ? 'fill-current' : 'fill-none stroke-current'}`} />
+            {fav ? (
+              <HeartIcon className="h-5 w-5" />
+            ) : (
+              <HeartIconOutline className="h-5 w-5" />
+            )}
           </button>
             {stickers.length > 0 && (
               <div className="flex flex-col items-end gap-2">

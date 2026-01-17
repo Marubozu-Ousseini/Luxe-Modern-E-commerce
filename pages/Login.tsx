@@ -93,7 +93,7 @@ const LoginPage: React.FC = () => {
         <p className="text-slate-600 mb-6">Accédez calmement à votre espace.</p>
         {error && <div className="mb-4 text-red-600 text-sm">{error}</div>}
         <form onSubmit={handleSubmit} className="space-y-4">
-          <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" className="w-full px-3 py-2 bg-gray-100 border border-transparent rounded-md focus:bg-white focus:border-accent focus:ring-1 focus:ring-accent" />
+          <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Téléphone ou email" className="w-full px-3 py-2 bg-gray-100 border border-transparent rounded-md focus:bg-white focus:border-accent focus:ring-1 focus:ring-accent" />
           <PasswordToggle value={password} onChange={e => setPassword(e.target.value)} placeholder="Mot de passe" className="w-full px-3 py-2 bg-gray-100 border border-transparent rounded-md focus:bg-white focus:border-accent focus:ring-1 focus:ring-accent" />
           <button className="w-full btn-primary py-2.5">Se connecter</button>
         </form>
