@@ -199,7 +199,8 @@ export default function AdminProductsPage() {
       if (!res.ok) throw new Error(body?.message || "Upload serveur échoué.");
       const proxyUrl = String(body?.proxyUrl || "");
       if (!proxyUrl) throw new Error("Réponse upload invalide.");
-      return `${window.location.origin}${proxyUrl}`;
+      // Store as same-origin relative URL so it works across domains (web.app, custom domain, etc.).
+      return proxyUrl;
     }
 
     // Always use same-origin server upload to avoid browser CORS preflights on signed PUT URLs.

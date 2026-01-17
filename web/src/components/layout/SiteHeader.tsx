@@ -10,6 +10,7 @@ import { useFavorites } from "@/components/favorites/FavoritesProvider";
 import { IconBag, IconHeart, IconReceipt, IconUser } from "@/components/ui/Icons";
 import { logoutEverywhere } from "@/lib/session";
 import { subscribeToAuthState } from "@/lib/firebaseClient";
+import { cacheSiteSettings, fetchSiteSettingsFromServer, getCachedSiteSettings } from "@/lib/siteSettings";
 
 const nav = [
   { href: "/shop", label: "Boutique" },
@@ -26,6 +27,34 @@ export function SiteHeader() {
   const [cartPulse, setCartPulse] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [brandName, setBrandName] = useState("Malafaareh");
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const server = await fetchSiteSettingsFromServer();
+      if (cancelled) return;
+      if (server) {
+        setBrandName(server.brandName);
+        cacheSiteSettings(server);
+        return;
+      }
+      const cached = getCachedSiteSettings();
+      if (cached) setBrandName(cached.brandName);
+    })();
+
+    function onStorage(e: StorageEvent) {
+      if (e.key !== "malafaareh_site_settings") return;
+      const cached = getCachedSiteSettings();
+      if (cached) setBrandName(cached.brandName);
+    }
+
+    window.addEventListener("storage", onStorage);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("storage", onStorage);
+    };
+  }, []);
 
   useEffect(() => {
     function update() {
@@ -144,14 +173,14 @@ export function SiteHeader() {
           >
             <Image
               src="/logo.png"
-              alt="Logo Malafaareh"
+              alt={`Logo ${brandName}`}
               fill
               sizes="36px"
               className="object-contain"
               priority
             />
           </span>
-          <span>Malafaareh</span>
+          <span>{brandName}</span>
         </Link>
 
         <nav className="hidden items-center gap-5 md:flex">

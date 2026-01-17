@@ -36,6 +36,11 @@ export default function AdminSettingsPage() {
   const [heroStatus, setHeroStatus] = useState<string>("");
   const [heroAuthRequired, setHeroAuthRequired] = useState(false);
 
+  const [brandName, setBrandName] = useState("Malafaareh");
+  const [tagline, setTagline] = useState("Le luxe qui murmure, la beauté.... Une présence qui reste.");
+  const [identityStatus, setIdentityStatus] = useState<string>("");
+  const [isSavingIdentity, setIsSavingIdentity] = useState(false);
+
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -115,6 +120,24 @@ export default function AdminSettingsPage() {
           return;
         }
         const idToken = await user.getIdToken();
+
+        // Load site settings (brand identity)
+        try {
+          const ssRes = await fetch("/api/admin/site-settings", {
+            headers: { accept: "application/json", authorization: `Bearer ${idToken}` },
+            credentials: "include",
+          });
+          if (ssRes.ok) {
+            const data = (await ssRes.json()) as any;
+            if (!cancelled) {
+              setBrandName(String(data?.brandName || "Malafaareh"));
+              setTagline(String(data?.tagline || "Le luxe qui murmure, la beauté.... Une présence qui reste."));
+            }
+          }
+        } catch {
+          // ignore
+        }
+
         const res = await fetch("/api/admin/hero-images", {
           headers: { accept: "application/json", authorization: `Bearer ${idToken}` },
           credentials: "include",
@@ -139,6 +162,44 @@ export default function AdminSettingsPage() {
       cancelled = true;
     };
   }, []);
+
+  async function onSaveIdentity() {
+    setIdentityStatus("");
+    const next = {
+      brandName: brandName.trim(),
+      tagline: tagline.trim(),
+    };
+    if (!next.brandName || !next.tagline) {
+      setIdentityStatus("Veuillez remplir tous les champs.");
+      return;
+    }
+
+    setIsSavingIdentity(true);
+    try {
+      const headers = await getAdminAuthHeaders({ "Content-Type": "application/json" });
+      const res = await fetch("/api/admin/site-settings", {
+        method: "PUT",
+        headers,
+        credentials: "include",
+        body: JSON.stringify(next),
+      });
+      if (res.status === 401 || res.status === 403) {
+        setHeroAuthRequired(true);
+        throw new Error("Authentification admin requise.");
+      }
+      if (!res.ok) throw new Error("save_failed");
+      setIdentityStatus("Enregistré.");
+      try {
+        localStorage.setItem("malafaareh_site_settings", JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+    } catch (e: any) {
+      setIdentityStatus(e?.message || "Impossible d'enregistrer.");
+    } finally {
+      setIsSavingIdentity(false);
+    }
+  }
 
   async function getAdminAuthHeaders(extra?: Record<string, string>): Promise<Record<string, string>> {
     const firebase = await import("@/lib/firebaseClient");
@@ -393,7 +454,8 @@ export default function AdminSettingsPage() {
             <label className="block">
               <span className="text-xs uppercase tracking-[0.12em] text-text-muted">Nom</span>
               <input
-                defaultValue="Malafaareh"
+                value={brandName}
+                onChange={(e) => setBrandName(e.target.value)}
                 className="mt-2 w-full rounded-card border border-border-soft bg-bg-surface px-4 py-2 text-sm text-text-primary shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
               />
             </label>
@@ -401,17 +463,22 @@ export default function AdminSettingsPage() {
             <label className="block">
               <span className="text-xs uppercase tracking-[0.12em] text-text-muted">Slogan</span>
               <textarea
-                defaultValue="Le luxe qui murmure, la beauté.... Une présence qui reste."
+                value={tagline}
+                onChange={(e) => setTagline(e.target.value)}
                 className="mt-2 min-h-24 w-full rounded-card border border-border-soft bg-bg-surface px-4 py-2 text-sm text-text-primary shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
               />
             </label>
 
             <button
               type="button"
+              disabled={isSavingIdentity || heroAuthRequired}
+              onClick={() => void onSaveIdentity()}
               className="mt-2 inline-flex w-full items-center justify-center rounded-card bg-accent px-5 py-3 text-sm font-medium text-bg-surface shadow-soft transition duration-150 ease-premium hover:scale-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
             >
               Enregistrer
             </button>
+
+            {identityStatus ? <p className="text-xs text-text-muted">{identityStatus}</p> : null}
           </div>
         </section>
 

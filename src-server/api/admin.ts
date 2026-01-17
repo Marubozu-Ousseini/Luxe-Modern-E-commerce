@@ -37,6 +37,7 @@ import {
   findUserByEmailAsync
 } from '../services/userService.js';
 import { getHeroImagesMap, setHeroImagesMap } from '../services/heroImagesGcsService.js';
+import { getSiteSettings, setSiteSettings } from '../services/siteSettingsGcsService.js';
 
 const router = Router();
 
@@ -189,6 +190,38 @@ router.put('/hero-images', async (req, res) => {
   } catch (e: any) {
     // eslint-disable-next-line no-console
     console.error('[admin hero-images] error', e);
+    return res.status(500).json({ message: 'Erreur serveur', details: String(e?.message || e) });
+  }
+});
+
+// === Site settings (brand identity) ===
+router.get('/site-settings', async (_req, res) => {
+  try {
+    const settings = await getSiteSettings();
+    res.setHeader('Cache-Control', 'no-store');
+    return res.json(settings);
+  } catch (e: any) {
+    // eslint-disable-next-line no-console
+    console.error('[admin site-settings] error', e);
+    return res.status(500).json({ message: 'Erreur serveur', details: String(e?.message || e) });
+  }
+});
+
+router.put('/site-settings', async (req, res) => {
+  try {
+    const schema = z.object({
+      brandName: z.string().trim().min(1).max(60),
+      tagline: z.string().trim().min(1).max(140),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: 'Champs invalides', details: parsed.error.flatten() });
+    }
+    await setSiteSettings(parsed.data);
+    return res.json({ ok: true });
+  } catch (e: any) {
+    // eslint-disable-next-line no-console
+    console.error('[admin site-settings] error', e);
     return res.status(500).json({ message: 'Erreur serveur', details: String(e?.message || e) });
   }
 });

@@ -1,3 +1,5 @@
+"use client";
+
 import {
   IconFacebook,
   IconInstagram,
@@ -5,16 +7,55 @@ import {
   IconTikTok,
   IconWhatsapp,
 } from "@/components/ui/Icons";
+import { useEffect, useState } from "react";
+import { cacheSiteSettings, fetchSiteSettingsFromServer, getCachedSiteSettings } from "@/lib/siteSettings";
 
 export function SiteFooter() {
+  const [brandName, setBrandName] = useState("Malafaareh");
+  const [tagline, setTagline] = useState("Le luxe qui murmure, la beauté.... Une présence qui reste.");
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const server = await fetchSiteSettingsFromServer();
+      if (cancelled) return;
+      if (server) {
+        setBrandName(server.brandName);
+        setTagline(server.tagline);
+        cacheSiteSettings(server);
+        return;
+      }
+      const cached = getCachedSiteSettings();
+      if (cached) {
+        setBrandName(cached.brandName);
+        setTagline(cached.tagline);
+      }
+    })();
+
+    function onStorage(e: StorageEvent) {
+      if (e.key !== "malafaareh_site_settings") return;
+      const cached = getCachedSiteSettings();
+      if (cached) {
+        setBrandName(cached.brandName);
+        setTagline(cached.tagline);
+      }
+    }
+
+    window.addEventListener("storage", onStorage);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("storage", onStorage);
+    };
+  }, []);
+
   return (
     <footer className="mt-12 border-t border-border-soft bg-footer-brown">
       <div className="mx-auto max-w-content px-6 py-8 md:px-8">
         <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="font-serif text-lg tracking-tight-luxe-sm">Malafaareh</p>
+            <p className="font-serif text-lg tracking-tight-luxe-sm">{brandName}</p>
             <p className="mt-2 max-w-md text-sm text-text-muted">
-              Le luxe qui murmure, la beauté.... Une présence qui reste.
+              {tagline}
             </p>
           </div>
 
@@ -67,7 +108,7 @@ export function SiteFooter() {
           </div>
         </div>
 
-        <p className="mt-6 text-xs text-text-muted">© 2026 Malafaareh by Sensei Marubozu</p>
+        <p className="mt-6 text-xs text-text-muted">© 2026 {brandName} by Sensei Marubozu</p>
       </div>
     </footer>
   );

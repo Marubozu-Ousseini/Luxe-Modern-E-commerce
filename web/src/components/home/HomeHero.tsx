@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/cn";
 import { heroImagesStorageKey } from "@/components/layout/HeroImage";
+import { cacheSiteSettings, fetchSiteSettingsFromServer, getCachedSiteSettings } from "@/lib/siteSettings";
 
 type HeroImages = Record<string, string[]>;
 
@@ -78,14 +79,39 @@ async function fetchHeroImagesFromServer(): Promise<HeroImages> {
 }
 
 export function HomeHero() {
+  const [brandName, setBrandName] = useState("Malafaareh");
+  const [tagline, setTagline] = useState("Le luxe qui murmure, la beauté.... Une présence qui reste.");
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const server = await fetchSiteSettingsFromServer();
+      if (cancelled) return;
+      if (server) {
+        setBrandName(server.brandName);
+        setTagline(server.tagline);
+        cacheSiteSettings(server);
+        return;
+      }
+      const cached = getCachedSiteSettings();
+      if (cached) {
+        setBrandName(cached.brandName);
+        setTagline(cached.tagline);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const slides = useMemo(
     () => [
-      heroSvg("Malafaareh", "Édition exclusive", "#0F3D3E", "#1C1C1C"),
-      heroSvg("Malafaareh", "Matières durables", "#8A7E72", "#0F3D3E"),
-      heroSvg("Malafaareh", "Silence & texture", "#1C1C1C", "#8A7E72"),
-      heroSvg("Malafaareh", "Gestes essentiels", "#0F3D3E", "#8A7E72"),
+      heroSvg(brandName, "Édition exclusive", "#0F3D3E", "#1C1C1C"),
+      heroSvg(brandName, "Matières durables", "#8A7E72", "#0F3D3E"),
+      heroSvg(brandName, "Silence & texture", "#1C1C1C", "#8A7E72"),
+      heroSvg(brandName, "Gestes essentiels", "#0F3D3E", "#8A7E72"),
     ],
-    []
+    [brandName]
   );
 
   const [override, setOverride] = useState<string[] | null>(null);
@@ -202,7 +228,7 @@ export function HomeHero() {
       <div className="relative px-6 py-16 md:px-12 md:py-24">
         <p className="text-xs uppercase tracking-[0.12em] text-text-muted">Édition exclusive</p>
         <h1 className="mt-4 max-w-3xl font-serif text-4xl leading-[1.1] tracking-tight-luxe md:text-6xl">
-          Le luxe qui murmure, la beauté.... Une présence qui reste.
+          {tagline}
         </h1>
         <p className="mt-5 max-w-xl text-base leading-7 text-text-muted">
           Une sélection curatée, guidée par le savoir-faire, la texture et une certitude tranquille.

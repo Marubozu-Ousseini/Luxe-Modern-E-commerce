@@ -27,6 +27,30 @@ export function isProductsPersistenceAvailable(): boolean {
   );
 }
 
+function normalizeImageUrlForClient(imageUrl: unknown): string {
+  const raw = typeof imageUrl === 'string' ? imageUrl.trim() : '';
+  if (!raw) return '';
+
+  // If the URL already is a relative proxy URL, keep it.
+  if (raw.startsWith('/api/media/')) return raw;
+
+  // If the stored URL contains our media proxy path but was saved with an origin
+  // (e.g. http://localhost:3000/api/media/... or https://<project>.web.app/api/media/...),
+  // return only the path so it works across domains/environments.
+  const idx = raw.indexOf('/api/media/');
+  if (idx >= 0) {
+    const sliced = raw.slice(idx);
+    return sliced.startsWith('/') ? sliced : `/${sliced}`;
+  }
+
+  return raw;
+}
+
+function normalizeProductForClient(p: Product): Product {
+  const normalized = normalizeImageUrlForClient((p as any).imageUrl);
+  return { ...p, imageUrl: normalized || p.imageUrl };
+}
+
 function isSampleProductsEnabled(): boolean {
   // By default, production must not show seeded/demo products.
   // Enable explicitly via USE_SAMPLE_PRODUCTS=true when needed.
@@ -220,7 +244,7 @@ export function getAllProducts(): Product[] {
 export async function getAllProductsAsync(): Promise<Product[]> {
   if (isDbAvailable()) {
     const { rows } = await query<any>('SELECT id, name, price, original_price as "originalPrice", description, category, image_url as "imageUrl", stock, limited_availability as "limitedAvailability", rating_rate as "ratingRate", rating_count as "ratingCount", labels FROM products ORDER BY id ASC');
-    return rows.map(r => ({
+    return rows.map(r => normalizeProductForClient({
       id: r.id,
       name: r.name,
       price: r.price,
@@ -236,15 +260,15 @@ export async function getAllProductsAsync(): Promise<Product[]> {
   }
 
   if (process.env.USE_FIRESTORE === 'true') {
-    return getAllProductsFs();
+    return (await getAllProductsFs()).map(normalizeProductForClient);
   }
 
   if (isGcsProductsEnabled()) {
     await ensureGcsSeeded();
-    return getAllProductsFromCatalog();
+    return (await getAllProductsFromCatalog()).map(normalizeProductForClient);
   }
 
-  return getAllProducts();
+  return getAllProducts().map(normalizeProductForClient);
 }
 
 export function getProducts(opts?: { q?: string; limit?: number; offset?: number }): Product[] {
@@ -274,7 +298,7 @@ export async function getProductsAsync(opts?: { q?: string; limit?: number; offs
     if (opts?.limit) { sql += ` LIMIT $${i++}`; values.push(opts.limit); }
     if (opts?.offset) { sql += ` OFFSET $${i++}`; values.push(opts.offset); }
     const { rows } = await query<any>(sql, values);
-    return rows.map(r => ({
+    return rows.map(r => normalizeProductForClient({
       id: r.id,
       name: r.name,
       price: r.price,
@@ -290,15 +314,15 @@ export async function getProductsAsync(opts?: { q?: string; limit?: number; offs
   }
 
   if (process.env.USE_FIRESTORE === 'true') {
-    return getProductsFs(opts);
+    return (await getProductsFs(opts)).map(normalizeProductForClient);
   }
 
   if (isGcsProductsEnabled()) {
     await ensureGcsSeeded();
-    return getProductsFromCatalog(opts);
+    return (await getProductsFromCatalog(opts)).map(normalizeProductForClient);
   }
 
-  return getProducts(opts);
+  return getProducts(opts).map(normalizeProductForClient);
 }
 
 export function addProduct(newProduct: Omit<Product, 'id' | 'rating'> & { rating?: Product['rating'] }): Product {
@@ -327,16 +351,16 @@ export async function addProductAsync(newProduct: Omit<Product, 'id' | 'rating'>
       JSON.stringify(newProduct.labels ?? [])
     ]);
     const id = result.rows[0].id;
-    return { id, rating: newProduct.rating || { rate: 0, count: 0 }, ...newProduct };
+    return normalizeProductForClient({ id, rating: newProduct.rating || { rate: 0, count: 0 }, ...newProduct } as Product);
   }
 
   if (process.env.USE_FIRESTORE === 'true') {
-    return addProductFs(newProduct);
+    return normalizeProductForClient(await addProductFs(newProduct));
   }
 
   if (isGcsProductsEnabled()) {
     await ensureGcsSeeded();
-    return addProductToCatalog(newProduct);
+    return normalizeProductForClient(await addProductToCatalog(newProduct));
   }
 
   return addProduct(newProduct);
