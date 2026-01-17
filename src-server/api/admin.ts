@@ -116,8 +116,13 @@ router.get('/dashboard', async (_req, res) => {
     }
 
     let storageBucket: string | null = null;
+    let admin: any = null;
     try {
-      const admin = getFirebaseAdmin();
+      admin = getFirebaseAdmin();
+    } catch {
+      admin = null;
+    }
+    try {
       storageBucket = resolveStorageBucketName(admin);
     } catch {
       storageBucket = null;
@@ -131,7 +136,8 @@ router.get('/dashboard', async (_req, res) => {
       },
       storage: {
         bucket: storageBucket,
-        productsPersistence: isProductsPersistenceAvailable(),
+        // This flag is specifically for the persisted GCS catalog (not DB/Firestore).
+        productsPersistence: process.env.USE_GCS_PRODUCTS === 'true',
       },
       products: {
         count: Array.isArray(products) ? products.length : 0,
