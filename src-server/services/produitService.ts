@@ -18,6 +18,9 @@ import {
   seedProductsCatalogIfMissing,
   updateProductInCatalog,
 } from './productsGcsService.js';
+import { getProductExtrasMap } from './productExtrasGcsService.js';
+
+// Option B: we keep the DB schema unchanged and persist optional merchandising fields in GCS.
 
 export function isProductsPersistenceAvailable(): boolean {
   return (
@@ -46,9 +49,56 @@ function normalizeImageUrlForClient(imageUrl: unknown): string {
   return raw;
 }
 
+function normalizeImageUrlsForClient(images: unknown): string[] {
+  if (!Array.isArray(images)) return [];
+  return images
+    .map((v) => normalizeImageUrlForClient(v))
+    .filter((v) => typeof v === 'string' && v.trim().length > 0);
+}
+
+function normalizeStringArray(input: unknown): string[] {
+  if (!Array.isArray(input)) return [];
+  return input
+    .map((v) => (typeof v === 'string' ? v.trim() : ''))
+    .filter((v) => v.length > 0);
+}
+
 function normalizeProductForClient(p: Product): Product {
   const normalized = normalizeImageUrlForClient((p as any).imageUrl);
-  return { ...p, imageUrl: normalized || p.imageUrl };
+  const images = normalizeImageUrlsForClient((p as any).images);
+  const colors = normalizeStringArray((p as any).colors);
+  const sizes = normalizeStringArray((p as any).sizes);
+  const editorNote = typeof (p as any).editorNote === 'string' ? String((p as any).editorNote) : undefined;
+  return {
+    ...p,
+    imageUrl: normalized || p.imageUrl,
+    images: images.length ? images : (p as any).images,
+    colors: colors.length ? colors : (p as any).colors,
+    sizes: sizes.length ? sizes : (p as any).sizes,
+    editorNote,
+  };
+}
+
+function applyExtrasFromMap(p: Product, extrasMap: Record<string, any> | null): Product {
+  const id = Number((p as any)?.id);
+  if (!extrasMap || !Number.isFinite(id)) return p;
+  const extra = extrasMap[String(id)];
+  if (!extra || typeof extra !== 'object') return p;
+
+  const images = normalizeImageUrlsForClient((extra as any).images);
+  const colors = normalizeStringArray((extra as any).colors);
+  const sizes = normalizeStringArray((extra as any).sizes);
+  const editorNote = typeof (extra as any).editorNote === 'string' ? String((extra as any).editorNote).trim() : '';
+
+  const next: any = { ...(p as any) };
+  if (images.length) {
+    next.images = images;
+    next.imageUrl = images[0];
+  }
+  if (colors.length) next.colors = colors;
+  if (sizes.length) next.sizes = sizes;
+  if (editorNote) next.editorNote = editorNote;
+  return next as Product;
 }
 
 function isSampleProductsEnabled(): boolean {
@@ -243,20 +293,37 @@ export function getAllProducts(): Product[] {
 
 export async function getAllProductsAsync(): Promise<Product[]> {
   if (isDbAvailable()) {
-    const { rows } = await query<any>('SELECT id, name, price, original_price as "originalPrice", description, category, image_url as "imageUrl", stock, limited_availability as "limitedAvailability", rating_rate as "ratingRate", rating_count as "ratingCount", labels FROM products ORDER BY id ASC');
-    return rows.map(r => normalizeProductForClient({
-      id: r.id,
-      name: r.name,
-      price: r.price,
-      originalPrice: r.originalPrice ?? undefined,
-      description: r.description,
-      category: r.category,
-      imageUrl: r.imageUrl,
-      stock: r.stock ?? 0,
-      limitedAvailability: r.limitedAvailability || undefined,
-      rating: { rate: Number(r.ratingRate || 0), count: Number(r.ratingCount || 0) },
-      labels: Array.isArray(r.labels) ? r.labels : (r.labels ? JSON.parse(r.labels) : undefined)
-    }));
+    let extrasMap: any = null;
+    try {
+      extrasMap = await getProductExtrasMap();
+    } catch {
+      extrasMap = null;
+    }
+
+    const { rows } = await query<any>(
+      'SELECT id, name, price, original_price as "originalPrice", description, category, image_url as "imageUrl", stock, limited_availability as "limitedAvailability", rating_rate as "ratingRate", rating_count as "ratingCount", labels FROM products ORDER BY id ASC'
+    );
+
+    return rows.map((r) =>
+      normalizeProductForClient(
+        applyExtrasFromMap(
+          {
+            id: r.id,
+            name: r.name,
+            price: r.price,
+            originalPrice: r.originalPrice ?? undefined,
+            description: r.description,
+            category: r.category,
+            imageUrl: r.imageUrl,
+            stock: r.stock ?? 0,
+            limitedAvailability: r.limitedAvailability || undefined,
+            rating: { rate: Number(r.ratingRate || 0), count: Number(r.ratingCount || 0) },
+            labels: Array.isArray(r.labels) ? r.labels : r.labels ? JSON.parse(r.labels) : undefined,
+          } as any,
+          extrasMap
+        )
+      )
+    );
   }
 
   if (process.env.USE_FIRESTORE === 'true') {
@@ -285,6 +352,13 @@ export function getProducts(opts?: { q?: string; limit?: number; offset?: number
 
 export async function getProductsAsync(opts?: { q?: string; limit?: number; offset?: number }): Promise<Product[]> {
   if (isDbAvailable()) {
+    let extrasMap: any = null;
+    try {
+      extrasMap = await getProductExtrasMap();
+    } catch {
+      extrasMap = null;
+    }
+
     const clauses: string[] = [];
     const values: any[] = [];
     let i = 1;
@@ -295,22 +369,35 @@ export async function getProductsAsync(opts?: { q?: string; limit?: number; offs
     }
     const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
     let sql = `SELECT id, name, price, original_price as "originalPrice", description, category, image_url as "imageUrl", stock, limited_availability as "limitedAvailability", rating_rate as "ratingRate", rating_count as "ratingCount", labels FROM products ${where} ORDER BY id ASC`;
-    if (opts?.limit) { sql += ` LIMIT $${i++}`; values.push(opts.limit); }
-    if (opts?.offset) { sql += ` OFFSET $${i++}`; values.push(opts.offset); }
+    if (opts?.limit) {
+      sql += ` LIMIT $${i++}`;
+      values.push(opts.limit);
+    }
+    if (opts?.offset) {
+      sql += ` OFFSET $${i++}`;
+      values.push(opts.offset);
+    }
     const { rows } = await query<any>(sql, values);
-    return rows.map(r => normalizeProductForClient({
-      id: r.id,
-      name: r.name,
-      price: r.price,
-      originalPrice: r.originalPrice ?? undefined,
-      description: r.description,
-      category: r.category,
-      imageUrl: r.imageUrl,
-      stock: r.stock ?? 0,
-      limitedAvailability: r.limitedAvailability || undefined,
-      rating: { rate: Number(r.ratingRate || 0), count: Number(r.ratingCount || 0) },
-      labels: Array.isArray(r.labels) ? r.labels : (r.labels ? JSON.parse(r.labels) : undefined)
-    }));
+    return rows.map((r) =>
+      normalizeProductForClient(
+        applyExtrasFromMap(
+          {
+            id: r.id,
+            name: r.name,
+            price: r.price,
+            originalPrice: r.originalPrice ?? undefined,
+            description: r.description,
+            category: r.category,
+            imageUrl: r.imageUrl,
+            stock: r.stock ?? 0,
+            limitedAvailability: r.limitedAvailability || undefined,
+            rating: { rate: Number(r.ratingRate || 0), count: Number(r.ratingCount || 0) },
+            labels: Array.isArray(r.labels) ? r.labels : r.labels ? JSON.parse(r.labels) : undefined,
+          } as any,
+          extrasMap
+        )
+      )
+    );
   }
 
   if (process.env.USE_FIRESTORE === 'true') {
@@ -337,19 +424,22 @@ export function addProduct(newProduct: Omit<Product, 'id' | 'rating'> & { rating
 
 export async function addProductAsync(newProduct: Omit<Product, 'id' | 'rating'> & { rating?: Product['rating'] }): Promise<Product> {
   if (isDbAvailable()) {
-    const result = await query<any>('INSERT INTO products (name, price, original_price, description, category, image_url, stock, limited_availability, rating_rate, rating_count, labels) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id', [
-      newProduct.name,
-      newProduct.price,
-      newProduct.originalPrice ?? null,
-      newProduct.description,
-      newProduct.category,
-      newProduct.imageUrl,
-      newProduct.stock ?? 0,
-      newProduct.limitedAvailability ?? false,
-      newProduct.rating?.rate ?? 0,
-      newProduct.rating?.count ?? 0,
-      JSON.stringify(newProduct.labels ?? [])
-    ]);
+    const result = await query<any>(
+      'INSERT INTO products (name, price, original_price, description, category, image_url, stock, limited_availability, rating_rate, rating_count, labels) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id',
+      [
+        newProduct.name,
+        newProduct.price,
+        newProduct.originalPrice ?? null,
+        newProduct.description,
+        newProduct.category,
+        newProduct.imageUrl,
+        newProduct.stock ?? 0,
+        newProduct.limitedAvailability ?? false,
+        newProduct.rating?.rate ?? 0,
+        newProduct.rating?.count ?? 0,
+        JSON.stringify(newProduct.labels ?? []),
+      ]
+    );
     const id = result.rows[0].id;
     return normalizeProductForClient({ id, rating: newProduct.rating || { rate: 0, count: 0 }, ...newProduct } as Product);
   }

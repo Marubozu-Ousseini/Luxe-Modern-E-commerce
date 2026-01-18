@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { products } from "@/lib/products";
 import { formatXaf } from "@/lib/money";
 import { subscribeToAuthState } from "@/lib/firebaseClient";
@@ -14,6 +14,10 @@ type AdminProduct = {
   description: string;
   category: string;
   imageUrl: string;
+  images?: string[];
+  colors?: string[];
+  sizes?: string[];
+  editorNote?: string;
   stock?: number;
 };
 
@@ -61,6 +65,8 @@ export default function AdminProductsPage() {
 
 
   const [authStatus, setAuthStatus] = useState<string>("");
+
+  const [expandedId, setExpandedId] = useState<number | null>(null);
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -177,12 +183,13 @@ export default function AdminProductsPage() {
     }
   }
 
-  async function uploadFirstImage(): Promise<string> {
-    const file = imageFiles[0] ?? imageFile;
-    if (!file) throw new Error("Image requise.");
+  async function uploadImages(files: File[]): Promise<string[]> {
+    if (!files.length) throw new Error("Image requise.");
 
-    async function uploadViaServer(): Promise<string> {
-      const headers = await getAdminAuthHeaders();
+    const headers = await getAdminAuthHeaders();
+    const out: string[] = [];
+
+    for (const file of files) {
       const form = new FormData();
       form.append("file", file);
       const res = await fetch("/api/admin/upload", {
@@ -201,12 +208,17 @@ export default function AdminProductsPage() {
       const proxyUrl = String(body?.proxyUrl || "");
       const url = publicUrl || proxyUrl;
       if (!url) throw new Error("Réponse upload invalide.");
-      // Store as same-origin relative URL so it works across domains (web.app, custom domain, etc.).
-      return url;
+      out.push(url);
     }
 
-    // Always use same-origin server upload to avoid browser CORS preflights on signed PUT URLs.
-    return await uploadViaServer();
+    return out;
+  }
+
+  function parseCommaList(raw: string): string[] {
+    return raw
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
   }
 
   function getBasePriceXaf(p: AdminProduct) {
@@ -286,7 +298,9 @@ export default function AdminProductsPage() {
     }
 
     try {
-      const imageUrl = await uploadFirstImage();
+      const files = imageFiles.length ? imageFiles : imageFile ? [imageFile] : [];
+      const images = await uploadImages(files);
+      const imageUrl = images[0];
       const base = Math.round(priceXaf);
       const promo = promoPriceXaf === null ? null : Math.round(promoPriceXaf);
 
@@ -295,6 +309,7 @@ export default function AdminProductsPage() {
         description: description.trim(),
         category: (category || "").trim(),
         imageUrl,
+        images,
         stock: Math.max(0, Math.floor(inventoryCount)),
         // If promo is set: price = promo, originalPrice = base
         // Else: price = base, originalPrice omitted
@@ -559,171 +574,275 @@ export default function AdminProductsPage() {
                     const key = String(p.id);
                     const basePrice = getBasePriceXaf(p);
                     const promoPrice = getPromoPriceXaf(p);
+                    const gallery = Array.isArray((p as any).images) ? ((p as any).images as string[]) : [];
                     return (
-                      <tr key={p.id} className="border-t border-border-soft text-sm">
-                        <td className="px-6 py-4 font-medium text-text-primary">
-                          <div className="flex flex-col">
+                      <Fragment key={p.id}>
+                        <tr className="border-t border-border-soft text-sm">
+                          <td className="px-6 py-4 font-medium text-text-primary">
+                            <div className="flex flex-col">
+                              <input
+                                defaultValue={p.name}
+                                onBlur={(e) => {
+                                  const nextName = e.currentTarget.value.trim();
+                                  if (!nextName) {
+                                    e.currentTarget.value = p.name;
+                                    return;
+                                  }
+                                  if (nextName !== p.name) {
+                                    void updateRemoteProduct(p.id, { name: nextName });
+                                  }
+                                }}
+                                className="w-full rounded-card border border-border-soft bg-bg-surface px-3 py-2 text-sm text-text-primary shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                                aria-label={`Nom ${p.name}`}
+                              />
+                              <span className="mt-1 text-xs text-text-muted">ID: {p.id}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <select
+                              value={p.category}
+                              onChange={(e) => {
+                                const next = e.target.value;
+                                void updateRemoteProduct(p.id, { category: next });
+                              }}
+                              className="w-full min-w-[160px] rounded-card border border-border-soft bg-bg-surface px-3 py-2 text-sm text-text-primary shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                              aria-label={`Catégorie ${p.name}`}
+                            >
+                              {categories.map((c) => (
+                                <option key={c} value={c}>
+                                  {c}
+                                </option>
+                              ))}
+                              {!categories.includes(p.category) ? <option value={p.category}>{p.category}</option> : null}
+                            </select>
+                          </td>
+                          <td className="px-6 py-4">
                             <input
-                              defaultValue={p.name}
+                              defaultValue={String(p.stock ?? 0)}
                               onBlur={(e) => {
-                                const nextName = e.currentTarget.value.trim();
-                                if (!nextName) {
-                                  e.currentTarget.value = p.name;
+                                const raw = e.currentTarget.value;
+                                const n = raw === "" ? NaN : Number(raw);
+                                if (!Number.isFinite(n) || n < 0) {
+                                  e.currentTarget.value = String(p.stock ?? 0);
                                   return;
                                 }
-                                if (nextName !== p.name) {
-                                  void updateRemoteProduct(p.id, { name: nextName });
+                                const next = Math.floor(n);
+                                if (next !== (p.stock ?? 0)) {
+                                  void updateRemoteProduct(p.id, { stock: next });
                                 }
                               }}
-                              className="w-full rounded-card border border-border-soft bg-bg-surface px-3 py-2 text-sm text-text-primary shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-                              aria-label={`Nom ${p.name}`}
+                              inputMode="numeric"
+                              type="number"
+                              min={0}
+                              step={1}
+                              className="w-full min-w-[120px] rounded-card border border-border-soft bg-bg-surface px-3 py-2 text-sm text-text-primary shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                              aria-label={`Stock ${p.name}`}
                             />
-                            <span className="mt-1 text-xs text-text-muted">ID: {p.id}</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <select
-                            value={p.category}
-                            onChange={(e) => {
-                              const next = e.target.value;
-                              void updateRemoteProduct(p.id, { category: next });
-                            }}
-                            className="w-full min-w-[160px] rounded-card border border-border-soft bg-bg-surface px-3 py-2 text-sm text-text-primary shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-                            aria-label={`Catégorie ${p.name}`}
-                          >
-                            {categories.map((c) => (
-                              <option key={c} value={c}>
-                                {c}
-                              </option>
-                            ))}
-                            {!categories.includes(p.category) ? (
-                              <option value={p.category}>{p.category}</option>
-                            ) : null}
-                          </select>
-                        </td>
-                        <td className="px-6 py-4">
-                          <input
-                            defaultValue={String(p.stock ?? 0)}
-                            onBlur={(e) => {
-                              const raw = e.currentTarget.value;
-                              const n = raw === "" ? NaN : Number(raw);
-                              if (!Number.isFinite(n) || n < 0) {
-                                e.currentTarget.value = String(p.stock ?? 0);
-                                return;
-                              }
-                              const next = Math.floor(n);
-                              if (next !== (p.stock ?? 0)) {
-                                void updateRemoteProduct(p.id, { stock: next });
-                              }
-                            }}
-                            inputMode="numeric"
-                            type="number"
-                            min={0}
-                            step={1}
-                            className="w-full min-w-[120px] rounded-card border border-border-soft bg-bg-surface px-3 py-2 text-sm text-text-primary shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-                            aria-label={`Stock ${p.name}`}
-                          />
-                        </td>
-                        <td className="px-6 py-4">
-                          <input
-                            defaultValue={String(basePrice)}
-                            onBlur={(e) => {
-                              const raw = e.currentTarget.value;
-                              const n = raw === "" ? NaN : Number(raw);
-                              if (!Number.isFinite(n) || n <= 0) {
-                                e.currentTarget.value = String(basePrice);
-                                return;
-                              }
-                              const nextBase = Math.floor(n);
-                              if (promoPrice !== null && promoPrice >= nextBase) {
-                                void updateRemoteProduct(p.id, { price: nextBase, originalPrice: null as any });
-                                return;
-                              }
-                              if (promoPrice !== null) {
-                                void updateRemoteProduct(p.id, { price: promoPrice, originalPrice: nextBase });
-                                return;
-                              }
-                              void updateRemoteProduct(p.id, { price: nextBase, originalPrice: null as any });
-                            }}
-                            inputMode="numeric"
-                            type="number"
-                            min={1}
-                            step={1}
-                            className="w-full min-w-[140px] rounded-card border border-border-soft bg-bg-surface px-3 py-2 text-sm text-text-primary shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-                            aria-label={`Prix ${p.name}`}
-                          />
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
+                          </td>
+                          <td className="px-6 py-4">
                             <input
-                              defaultValue={promoPrice === null ? "" : String(promoPrice)}
+                              defaultValue={String(basePrice)}
                               onBlur={(e) => {
-                                const base = getBasePriceXaf(p);
                                 const raw = e.currentTarget.value;
-                                if (raw === "") {
-                                  void updateRemoteProduct(p.id, { price: base, originalPrice: null as any });
-                                  return;
-                                }
-                                const n = Number(raw);
+                                const n = raw === "" ? NaN : Number(raw);
                                 if (!Number.isFinite(n) || n <= 0) {
-                                  e.currentTarget.value = promoPrice === null ? "" : String(promoPrice);
+                                  e.currentTarget.value = String(basePrice);
                                   return;
                                 }
-                                const nextPromo = Math.floor(n);
-                                if (nextPromo >= base) {
-                                  e.currentTarget.value = promoPrice === null ? "" : String(promoPrice);
+                                const nextBase = Math.floor(n);
+                                if (promoPrice !== null && promoPrice >= nextBase) {
+                                  void updateRemoteProduct(p.id, { price: nextBase, originalPrice: null as any });
                                   return;
                                 }
-                                void updateRemoteProduct(p.id, { price: nextPromo, originalPrice: base });
+                                if (promoPrice !== null) {
+                                  void updateRemoteProduct(p.id, { price: promoPrice, originalPrice: nextBase });
+                                  return;
+                                }
+                                void updateRemoteProduct(p.id, { price: nextBase, originalPrice: null as any });
                               }}
                               inputMode="numeric"
                               type="number"
                               min={1}
-                              max={Math.max(1, basePrice - 1)}
                               step={1}
                               className="w-full min-w-[140px] rounded-card border border-border-soft bg-bg-surface px-3 py-2 text-sm text-text-primary shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-                              placeholder="—"
-                              title="Doit être inférieur au prix"
+                              aria-label={`Prix ${p.name}`}
                             />
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <select
-                            value={statusOverrides[key] ?? "Actif"}
-                            onChange={(e) => saveStatusOverride(key, e.target.value as ProductStatus)}
-                            className="w-full min-w-[140px] rounded-card border border-border-soft bg-bg-surface px-3 py-2 text-sm text-text-primary shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-                            aria-label={`Statut ${p.name}`}
-                          >
-                            <option value="Actif">Actif</option>
-                            <option value="Désactivé">Désactivé</option>
-                          </select>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <a
-                              href={p.imageUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-sm text-text-primary underline decoration-border-soft underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-2">
+                              <input
+                                defaultValue={promoPrice === null ? "" : String(promoPrice)}
+                                onBlur={(e) => {
+                                  const base = getBasePriceXaf(p);
+                                  const raw = e.currentTarget.value;
+                                  if (raw === "") {
+                                    void updateRemoteProduct(p.id, { price: base, originalPrice: null as any });
+                                    return;
+                                  }
+                                  const n = Number(raw);
+                                  if (!Number.isFinite(n) || n <= 0) {
+                                    e.currentTarget.value = promoPrice === null ? "" : String(promoPrice);
+                                    return;
+                                  }
+                                  const nextPromo = Math.floor(n);
+                                  if (nextPromo >= base) {
+                                    e.currentTarget.value = promoPrice === null ? "" : String(promoPrice);
+                                    return;
+                                  }
+                                  void updateRemoteProduct(p.id, { price: nextPromo, originalPrice: base });
+                                }}
+                                inputMode="numeric"
+                                type="number"
+                                min={1}
+                                max={Math.max(1, basePrice - 1)}
+                                step={1}
+                                className="w-full min-w-[140px] rounded-card border border-border-soft bg-bg-surface px-3 py-2 text-sm text-text-primary shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                                placeholder="—"
+                                title="Doit être inférieur au prix"
+                              />
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <select
+                              value={statusOverrides[key] ?? "Actif"}
+                              onChange={(e) => saveStatusOverride(key, e.target.value as ProductStatus)}
+                              className="w-full min-w-[140px] rounded-card border border-border-soft bg-bg-surface px-3 py-2 text-sm text-text-primary shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                              aria-label={`Statut ${p.name}`}
                             >
-                              Image
-                            </a>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const ok = confirm(`Supprimer “${p.name}” ?`);
-                                if (!ok) return;
-                                void deleteRemoteProduct(p.id).catch((err: any) => {
-                                  setAuthStatus(err?.message || "Impossible de supprimer.");
-                                });
-                              }}
-                              className="text-sm text-text-muted underline decoration-border-soft underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-                            >
-                              Supprimer
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
+                              <option value="Actif">Actif</option>
+                              <option value="Désactivé">Désactivé</option>
+                            </select>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              <a
+                                href={(gallery[0] || p.imageUrl) as any}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-sm text-text-primary underline decoration-border-soft underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                              >
+                                Image
+                              </a>
+                              <button
+                                type="button"
+                                onClick={() => setExpandedId((prev) => (prev === p.id ? null : p.id))}
+                                className="text-sm text-text-primary underline decoration-border-soft underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                              >
+                                Options
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const ok = confirm(`Supprimer “${p.name}” ?`);
+                                  if (!ok) return;
+                                  void deleteRemoteProduct(p.id).catch((err: any) => {
+                                    setAuthStatus(err?.message || "Impossible de supprimer.");
+                                  });
+                                }}
+                                className="text-sm text-text-muted underline decoration-border-soft underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                              >
+                                Supprimer
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+
+                        {expandedId === p.id ? (
+                          <tr className="border-t border-border-soft bg-bg-subtle/40 text-sm">
+                            <td className="px-6 py-4" colSpan={7}>
+                              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                <label className="block">
+                                  <span className="text-xs uppercase tracking-[0.12em] text-text-muted">Couleurs (séparées par des virgules)</span>
+                                  <input
+                                    defaultValue={Array.isArray((p as any).colors) ? ((p as any).colors as string[]).join(", ") : ""}
+                                    onBlur={(e) => {
+                                      const next = parseCommaList(e.currentTarget.value);
+                                      void updateRemoteProduct(p.id, { colors: next as any }).catch((err: any) => {
+                                        setAuthStatus(err?.message || "Impossible de mettre à jour.");
+                                      });
+                                    }}
+                                    className="mt-2 w-full rounded-card border border-border-soft bg-bg-surface px-4 py-2 text-sm text-text-primary shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                                    placeholder="Ex: Noir, Ivoire"
+                                  />
+                                </label>
+
+                                <label className="block">
+                                  <span className="text-xs uppercase tracking-[0.12em] text-text-muted">Tailles (séparées par des virgules)</span>
+                                  <input
+                                    defaultValue={Array.isArray((p as any).sizes) ? ((p as any).sizes as string[]).join(", ") : ""}
+                                    onBlur={(e) => {
+                                      const next = parseCommaList(e.currentTarget.value);
+                                      void updateRemoteProduct(p.id, { sizes: next as any }).catch((err: any) => {
+                                        setAuthStatus(err?.message || "Impossible de mettre à jour.");
+                                      });
+                                    }}
+                                    className="mt-2 w-full rounded-card border border-border-soft bg-bg-surface px-4 py-2 text-sm text-text-primary shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                                    placeholder="Ex: S, M, L"
+                                  />
+                                </label>
+
+                                <label className="block md:col-span-2">
+                                  <span className="text-xs uppercase tracking-[0.12em] text-text-muted">Une note choisie</span>
+                                  <textarea
+                                    defaultValue={typeof (p as any).editorNote === "string" ? String((p as any).editorNote) : ""}
+                                    onBlur={(e) => {
+                                      const next = e.currentTarget.value.trim();
+                                      void updateRemoteProduct(p.id, { editorNote: (next || null) as any }).catch((err: any) => {
+                                        setAuthStatus(err?.message || "Impossible de mettre à jour.");
+                                      });
+                                    }}
+                                    rows={3}
+                                    className="mt-2 w-full resize-none rounded-card border border-border-soft bg-bg-surface px-4 py-2 text-sm text-text-primary shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                                    placeholder="Texte court (sans guillemets)"
+                                  />
+                                </label>
+
+                                <div className="md:col-span-2">
+                                  <p className="text-xs uppercase tracking-[0.12em] text-text-muted">Images du produit</p>
+                                  <div className="mt-2 flex flex-wrap items-center gap-3">
+                                    <span className="text-sm text-text-muted">{gallery.length ? `${gallery.length} images` : "1 image"}</span>
+                                    {gallery.length ? (
+                                      <a
+                                        href={gallery[0]}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="text-sm text-text-primary underline decoration-border-soft underline-offset-4"
+                                      >
+                                        Ouvrir la première
+                                      </a>
+                                    ) : null}
+                                  </div>
+
+                                  <div className="mt-3">
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      multiple
+                                      onChange={(e) => {
+                                        const files = Array.from(e.target.files ?? []);
+                                        if (!files.length) return;
+                                        void (async () => {
+                                          try {
+                                            const urls = await uploadImages(files);
+                                            await updateRemoteProduct(p.id, { images: urls as any, imageUrl: urls[0] } as any);
+                                            setAuthStatus("");
+                                          } catch (err: any) {
+                                            setAuthStatus(err?.message || "Impossible de mettre à jour les images.");
+                                          } finally {
+                                            e.currentTarget.value = "";
+                                          }
+                                        })();
+                                      }}
+                                      className="w-full rounded-card border border-border-soft bg-bg-surface px-4 py-2 text-sm text-text-primary shadow-soft file:mr-4 file:rounded-card file:border-0 file:bg-bg-subtle file:px-4 file:py-2 file:text-sm file:font-medium file:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                                    />
+                                    <p className="mt-2 text-xs text-text-muted">Sélectionnez des fichiers pour remplacer la galerie.</p>
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        ) : null}
+                      </Fragment>
                     );
                   })}
                 </tbody>

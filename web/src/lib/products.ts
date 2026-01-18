@@ -15,6 +15,8 @@ export type Product = {
   details: string[];
   care: string[];
   imageUrl?: string;
+  images?: string[];
+  editorNote?: string;
   stock?: number;
 };
 

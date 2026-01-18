@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Product } from "@/lib/products";
-import { Accordion } from "@/components/ui/Accordion";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { useCart } from "@/components/cart/useCart";
@@ -144,12 +143,23 @@ export function ProductShowroom({ product, related }: { product: Product & { id?
     return undefined;
   }, [product.priceXaf, (product as any).promoPriceXaf, promoOverride]);
 
-  const media = useMemo(() => {
-    const primary = (product as any).imageUrl ? String((product as any).imageUrl) : placeholderSvg(product.name);
-    return [primary, placeholderSvg("Texture"), placeholderSvg("Tombé")];
-  }, [product.name, (product as any).imageUrl]);
+  const media = useMemo<string[]>(() => {
+    const rawImages = Array.isArray((product as any).images) ? (product as any).images : [];
+    const images = rawImages
+      .map((v: any) => (typeof v === "string" ? v.trim() : ""))
+      .filter((v: string) => v.length > 0);
+
+    if (images.length) return images;
+
+    const primary = (product as any).imageUrl ? String((product as any).imageUrl) : "";
+    return [primary || placeholderSvg(product.name)];
+  }, [product.name, (product as any).imageUrl, (product as any).images]);
 
   const [active, setActive] = useState(0);
+
+  useEffect(() => {
+    setActive(0);
+  }, [product.slug]);
 
   function addToBag() {
     setCartPulse(true);
@@ -206,7 +216,7 @@ export function ProductShowroom({ product, related }: { product: Product & { id?
               ) : null}
             </div>
             <div className="flex gap-3 border-t border-border-soft bg-bg-surface p-4">
-              {media.map((src, idx) => (
+              {media.map((src: string, idx: number) => (
                 <button
                   key={idx}
                   type="button"
@@ -318,51 +328,12 @@ export function ProductShowroom({ product, related }: { product: Product & { id?
             </div>
           </div>
 
-          <div className="mt-8">
-            <Accordion
-              items={[
-                {
-                  title: "Détails",
-                  content: (
-                    <ul className="list-disc pl-5">
-                      {product.details.map((d) => (
-                        <li key={d}>{d}</li>
-                      ))}
-                    </ul>
-                  ),
-                },
-                {
-                  title: "Matières & entretien",
-                  content: (
-                    <div>
-                      <p className="text-sm text-text-muted">{product.materials.join(", ")}</p>
-                      <ul className="mt-3 list-disc pl-5">
-                        {product.care.map((c) => (
-                          <li key={c}>{c}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  ),
-                },
-                {
-                  title: "Livraison & retours",
-                  content: (
-                    <div>
-                      <p>
-                        Les estimations de livraison sont indiquées tôt au paiement. Les retours sont offerts sous 14 jours.
-                      </p>
-                      <p className="mt-2">Chiffrement sécurisé et indications claires en ligne.</p>
-                    </div>
-                  ),
-                },
-              ]}
-            />
-          </div>
-
           <div className="mt-10 rounded-modal border border-border-soft bg-bg-surface p-6 shadow-soft">
             <p className="text-xs uppercase tracking-[0.12em] text-text-muted">Une note choisie</p>
             <p className="mt-3 font-serif text-xl tracking-tight-luxe-sm">
-              « La texture est intentionnelle. La finition est silencieuse. Cela ressemble à un goût personnel. »
+              {typeof (product as any).editorNote === "string" && String((product as any).editorNote).trim().length > 0
+                ? `« ${String((product as any).editorNote).trim()} »`
+                : "« La texture est intentionnelle. La finition est silencieuse. Cela ressemble à un goût personnel. »"}
             </p>
             <p className="mt-3 text-sm text-text-muted">— Éditeur Atelier</p>
           </div>

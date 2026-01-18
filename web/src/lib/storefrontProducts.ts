@@ -8,6 +8,10 @@ export type ApiProduct = {
   description: string;
   category: string;
   imageUrl: string;
+  images?: string[] | null;
+  colors?: string[] | null;
+  sizes?: string[] | null;
+  editorNote?: string | null;
   stock?: number | null;
   limitedAvailability?: boolean | null;
   labels?: string[] | null;
@@ -41,6 +45,11 @@ export function apiProductToUiProduct(p: ApiProduct): Product & { id: number; im
   const hasOriginal = typeof p.originalPrice === "number" && Number.isFinite(p.originalPrice) && p.originalPrice > 0;
   const basePriceXaf = hasOriginal ? (p.originalPrice as number) : p.price;
   const promoPriceXaf = hasOriginal ? p.price : undefined;
+
+  const images = Array.isArray(p.images) ? p.images.filter((x) => typeof x === "string" && x.trim().length > 0) : [];
+  const colors = Array.isArray(p.colors) ? p.colors.filter((x) => typeof x === "string" && x.trim().length > 0) : [];
+  const sizes = Array.isArray(p.sizes) ? p.sizes.filter((x) => typeof x === "string" && x.trim().length > 0) : [];
+
   return {
     id: p.id,
     slug: `${slugify(p.name)}-${p.id}`,
@@ -49,14 +58,16 @@ export function apiProductToUiProduct(p: ApiProduct): Product & { id: number; im
     priceXaf: basePriceXaf,
     promoPriceXaf,
     materials: [],
-    colors: [],
-    sizes: [],
+    colors: colors.length ? colors : ["Unique"],
+    sizes: sizes.length ? sizes : ["Taille unique"],
     fit: "",
     limitedAvailability: Boolean(p.limitedAvailability),
     description: p.description,
     details: [],
     care: [],
-    imageUrl: p.imageUrl,
+    imageUrl: images[0] || p.imageUrl,
+    images: images.length ? images : undefined,
+    editorNote: typeof p.editorNote === "string" && p.editorNote.trim() ? p.editorNote.trim() : undefined,
     stock: typeof p.stock === "number" && Number.isFinite(p.stock) ? p.stock : undefined,
   };
 }

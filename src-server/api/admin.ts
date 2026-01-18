@@ -39,6 +39,7 @@ import {
 import { getHeroImagesMap, setHeroImagesMap } from '../services/heroImagesGcsService.js';
 import { getSiteSettings, setSiteSettings } from '../services/siteSettingsGcsService.js';
 import { getAds, setAds } from '../services/adsGcsService.js';
+import { setProductExtras } from '../services/productExtrasGcsService.js';
 
 const router = Router();
 
@@ -278,48 +279,169 @@ router.put('/ads', async (req, res) => {
 });
 
 router.post('/produits', async (req, res) => {
+  const mediaUrlSchema = z
+    .string()
+    .min(1)
+    .max(500)
+    .refine(
+      (v) => {
+        const s = String(v || '').trim();
+        if (!s) return false;
+        if (s.startsWith('/api/admin/object/')) return false;
+        // Prefer domain-agnostic, public proxy URL
+        if (s.startsWith('/api/media/')) return true;
+        // Allow absolute URLs for backwards compatibility
+        if (s.startsWith('https://') || s.startsWith('http://')) return true;
+        return false;
+      },
+      { message: 'URL invalide (utilisez /api/media/...)' }
+    );
+
   const schema = z.object({
     name: z.string().min(1),
     price: z.number().positive(),
     originalPrice: z.number().positive().optional(),
     description: z.string().min(1),
     category: z.string().min(1),
-    imageUrl: z
-      .string()
-      .min(1)
-      .max(500)
-      .refine(
-        (v) => {
-          const s = String(v || '').trim();
-          if (!s) return false;
-          // Prefer domain-agnostic, public proxy URL
-          if (s.startsWith('/api/media/')) return true;
-          // Allow absolute URLs for backwards compatibility
-          if (s.startsWith('https://') || s.startsWith('http://')) return true;
-          return false;
-        },
-        { message: 'imageUrl invalide (utilisez /api/media/...)' }
-      ),
+    imageUrl: mediaUrlSchema.optional(),
+    images: z.array(mediaUrlSchema).max(12).optional(),
+    colors: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
+    sizes: z.array(z.string().trim().min(1).max(40)).max(30).optional(),
+    editorNote: z.string().trim().min(1).max(400).optional(),
     stock: z.number().int().nonnegative().optional(),
   });
   const parse = schema.safeParse(req.body);
   if (!parse.success) return res.status(400).json({ message: 'Champs invalides', details: parse.error.flatten() });
-  const { name, price, originalPrice, description, category, imageUrl, stock } = parse.data;
+  const { name, price, originalPrice, description, category, stock } = parse.data;
+  const images = Array.isArray(parse.data.images) ? parse.data.images : undefined;
+  const imageUrl = parse.data.imageUrl || (images && images.length ? images[0] : undefined);
 
-  if (String(imageUrl).startsWith('/api/admin/object/')) {
-    return res.status(400).json({ message: 'imageUrl doit être public (/api/media/...)' });
+  if (!imageUrl) {
+    return res.status(400).json({ message: 'imageUrl requis (ou images[0])' });
   }
+
   const product = isProductsPersistenceAvailable()
-    ? await addProductAsync({ name, price, originalPrice, description, category, imageUrl, stock })
-    : addProduct({ name, price, originalPrice, description, category, imageUrl, stock });
-  return res.status(201).json(product);
+    ? await addProductAsync({
+        name,
+        price,
+        originalPrice,
+        description,
+        category,
+        imageUrl,
+        stock,
+      } as any)
+    : addProduct({
+        name,
+        price,
+        originalPrice,
+        description,
+        category,
+        imageUrl,
+        stock,
+      } as any);
+
+  // Persist the optional extras outside of the DB (no schema migration required).
+  try {
+    const pid = Number((product as any)?.id);
+    if (Number.isFinite(pid)) {
+      await setProductExtras(pid, {
+        images,
+        colors: parse.data.colors,
+        sizes: parse.data.sizes,
+        editorNote: parse.data.editorNote,
+      });
+    }
+  } catch {
+    // non-bloquant: product created in DB even if extras couldn't be written
+  }
+
+  const merged: any = { ...(product as any) };
+  if (images?.length) merged.images = images;
+  if (parse.data.colors?.length) merged.colors = parse.data.colors;
+  if (parse.data.sizes?.length) merged.sizes = parse.data.sizes;
+  if (parse.data.editorNote) merged.editorNote = parse.data.editorNote;
+  return res.status(201).json(merged);
 });
 
 router.put('/produits/:id', async (req, res) => {
   const id = Number(req.params.id);
-  const updated = isProductsPersistenceAvailable() ? await updateProductAsync(id, req.body ?? {}) : updateProduct(id, req.body ?? {});
+
+  const mediaUrlSchema = z
+    .string()
+    .min(1)
+    .max(500)
+    .refine(
+      (v) => {
+        const s = String(v || '').trim();
+        if (!s) return false;
+        if (s.startsWith('/api/admin/object/')) return false;
+        if (s.startsWith('/api/media/')) return true;
+        if (s.startsWith('https://') || s.startsWith('http://')) return true;
+        return false;
+      },
+      { message: 'URL invalide (utilisez /api/media/...)' }
+    );
+
+  const patchSchema = z
+    .object({
+      name: z.string().min(1).optional(),
+      price: z.number().positive().optional(),
+      originalPrice: z.number().positive().nullable().optional(),
+      description: z.string().min(1).optional(),
+      category: z.string().min(1).optional(),
+      imageUrl: mediaUrlSchema.optional(),
+      images: z.array(mediaUrlSchema).max(12).optional(),
+      colors: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
+      sizes: z.array(z.string().trim().min(1).max(40)).max(30).optional(),
+      editorNote: z.string().trim().min(1).max(400).nullable().optional(),
+      stock: z.number().int().nonnegative().optional(),
+      limitedAvailability: z.boolean().optional(),
+      labels: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
+    })
+    .strict();
+
+  const parsed = patchSchema.safeParse(req.body ?? {});
+  if (!parsed.success) return res.status(400).json({ message: 'Champs invalides', details: parsed.error.flatten() });
+
+  const body: any = parsed.data as any;
+
+  // Extract "extras" fields to store in GCS (no DB migration).
+  const extrasPatch: any = {};
+  if (body.images !== undefined) extrasPatch.images = body.images;
+  if (body.colors !== undefined) extrasPatch.colors = body.colors;
+  if (body.sizes !== undefined) extrasPatch.sizes = body.sizes;
+  if (body.editorNote !== undefined) extrasPatch.editorNote = body.editorNote;
+
+  if (extrasPatch.images !== undefined && Array.isArray(extrasPatch.images) && extrasPatch.images.length && body.imageUrl === undefined) {
+    // Keep DB primary image aligned with the first gallery image.
+    body.imageUrl = extrasPatch.images[0];
+  }
+
+  // Remove extras before updating DB row.
+  delete body.images;
+  delete body.colors;
+  delete body.sizes;
+  delete body.editorNote;
+
+  if (Object.keys(extrasPatch).length) {
+    try {
+      await setProductExtras(id, extrasPatch);
+    } catch {
+      // non-bloquant: still update DB core fields
+    }
+  }
+
+  const updated = isProductsPersistenceAvailable() ? await updateProductAsync(id, body) : updateProduct(id, body);
   if (!updated) return res.status(404).json({ message: 'Produit introuvable' });
-  return res.json(updated);
+
+  // Return merged object for immediate UI refresh.
+  const merged: any = { ...(updated as any) };
+  if (extrasPatch.images !== undefined) merged.images = extrasPatch.images;
+  if (extrasPatch.colors !== undefined) merged.colors = extrasPatch.colors;
+  if (extrasPatch.sizes !== undefined) merged.sizes = extrasPatch.sizes;
+  if (extrasPatch.editorNote !== undefined) merged.editorNote = extrasPatch.editorNote;
+
+  return res.json(merged);
 });
 
 router.delete('/produits/:id', async (req, res) => {

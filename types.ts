@@ -10,6 +10,8 @@ export interface Product {
   imageUrl: string;
   /** Optional gallery images for PDP carousel */
   images?: string[];
+  /** Optional short editorial quote shown on PDP ("Une note choisie") */
+  editorNote?: string;
   /** Optional product video for gallery */
   videoUrl?: string;
   /** Optional available stock quantity for inventory management */
