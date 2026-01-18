@@ -108,12 +108,7 @@ export default function ShopPage() {
       </div>
 
       <div className="mt-8">
-        <InlineAdBanner
-          title="Annonce — format bannière"
-          body="Emplacement idéal pour une image produit + un texte court (livraison, avantage membre, nouveauté)."
-          ctaLabel="Découvrir"
-          href="/shop"
-        />
+        <InlineAdBanner placementKey="shop" />
       </div>
 
       {filtered.length === 0 ? (

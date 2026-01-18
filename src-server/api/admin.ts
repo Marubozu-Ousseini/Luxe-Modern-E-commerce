@@ -38,6 +38,7 @@ import {
 } from '../services/userService.js';
 import { getHeroImagesMap, setHeroImagesMap } from '../services/heroImagesGcsService.js';
 import { getSiteSettings, setSiteSettings } from '../services/siteSettingsGcsService.js';
+import { getAds, setAds } from '../services/adsGcsService.js';
 
 const router = Router();
 
@@ -222,6 +223,56 @@ router.put('/site-settings', async (req, res) => {
   } catch (e: any) {
     // eslint-disable-next-line no-console
     console.error('[admin site-settings] error', e);
+    return res.status(500).json({ message: 'Erreur serveur', details: String(e?.message || e) });
+  }
+});
+
+// === Ads (publicités) ===
+router.get('/ads', async (_req, res) => {
+  try {
+    const ads = await getAds();
+    res.setHeader('Cache-Control', 'no-store');
+    return res.json(ads);
+  } catch (e: any) {
+    // eslint-disable-next-line no-console
+    console.error('[admin ads] error', e);
+    return res.status(500).json({ message: 'Erreur serveur', details: String(e?.message || e) });
+  }
+});
+
+router.put('/ads', async (req, res) => {
+  try {
+    const schema = z.array(
+      z.object({
+        id: z.string().min(1).max(80),
+        kind: z.enum(['text', 'image', 'video']),
+        placements: z.array(z.enum(['home', 'shop', 'category'])).min(1).max(3),
+        eyebrow: z.string().min(1).max(24).optional(),
+        title: z.string().min(1).max(80),
+        body: z.string().min(1).max(280),
+        ctaLabel: z.string().min(1).max(24),
+        href: z.string().min(1).max(200),
+        mediaUrl: z.string().min(1).max(300).optional(),
+      })
+    );
+
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: 'Champs invalides', details: parsed.error.flatten() });
+    }
+
+    // Enforce mediaUrl for image/video.
+    for (const ad of parsed.data) {
+      if ((ad.kind === 'image' || ad.kind === 'video') && !ad.mediaUrl) {
+        return res.status(400).json({ message: 'mediaUrl requis pour image/vidéo' });
+      }
+    }
+
+    await setAds(parsed.data as any);
+    return res.json({ ok: true });
+  } catch (e: any) {
+    // eslint-disable-next-line no-console
+    console.error('[admin ads] error', e);
     return res.status(500).json({ message: 'Erreur serveur', details: String(e?.message || e) });
   }
 });

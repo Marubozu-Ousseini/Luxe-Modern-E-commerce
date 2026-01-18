@@ -1,79 +1,98 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import {
+  cacheAds,
+  fetchAdsFromServer,
+  getCachedAds,
+  type AdConfig,
+  type AdPlacementKey,
+} from "@/lib/ads";
 
-type AdKind = "image" | "text" | "video";
+function useAdsData() {
+  const [ads, setAds] = useState<AdConfig[]>(() => {
+    try {
+      return getCachedAds();
+    } catch {
+      return [];
+    }
+  });
 
-export type AdPlacement = {
-  kind: AdKind;
-  eyebrow: string;
-  title: string;
-  body: string;
-  ctaLabel: string;
-  href: string;
-};
+  useEffect(() => {
+    let cancelled = false;
+    fetchAdsFromServer()
+      .then((list) => {
+        if (cancelled) return;
+        setAds(list);
+        cacheAds(list);
+      })
+      .catch(() => {
+        // Keep cached data.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-const defaultPlacements: AdPlacement[] = [
-  {
-    kind: "image",
-    eyebrow: "Annonce",
-    title: "Collection partenaire",
-    body: "Emplacement prévu pour une image (JPG/PNG/SVG) + un message court.",
-    ctaLabel: "Découvrir",
-    href: "/shop",
-  },
-  {
-    kind: "text",
-    eyebrow: "Annonce",
-    title: "Offre de bienvenue",
-    body: "Texte court pour un message rapide : nouveauté, livraison, avantage membre, ou lancement.",
-    ctaLabel: "Voir l’offre",
-    href: "/register",
-  },
-  {
-    kind: "video",
-    eyebrow: "Annonce",
-    title: "Vidéo courte",
-    body: "Emplacement prévu pour une vidéo (MP4/WebM) : routine, unboxing, focus matière.",
-    ctaLabel: "Regarder",
-    href: "/shop",
-  },
-];
+  return ads;
+}
 
-function PlaceholderMedia({ kind }: { kind: Exclude<AdKind, "text"> }) {
-  const background =
-    kind === "image"
-      ? "radial-gradient(80% 80% at 20% 20%, rgba(0,0,0,0.10), rgba(0,0,0,0)), radial-gradient(70% 70% at 75% 75%, rgba(0,0,0,0.10), rgba(0,0,0,0))"
-      : "radial-gradient(70% 70% at 50% 45%, rgba(0,0,0,0.12), rgba(0,0,0,0))";
-
+function PlaceholderMedia() {
   return (
     <div
       className="relative overflow-hidden rounded-card border border-border-soft bg-bg-subtle"
       aria-hidden
-      style={{ background }}
+      style={{
+        background:
+          "radial-gradient(80% 80% at 20% 20%, rgba(0,0,0,0.10), rgba(0,0,0,0)), radial-gradient(70% 70% at 75% 75%, rgba(0,0,0,0.10), rgba(0,0,0,0))",
+      }}
     >
       <div className="aspect-[16/9]" />
+    </div>
+  );
+}
 
-      {kind === "video" ? (
-        <div className="absolute inset-0 grid place-items-center">
-          <div className="grid place-items-center rounded-full border border-border-soft bg-bg-surface/80 p-3 shadow-soft">
-            <svg viewBox="0 0 24 24" className="h-5 w-5 text-text-primary" aria-hidden>
-              <path fill="currentColor" d="M9 7.5v9l8-4.5-8-4.5Z" />
-            </svg>
-          </div>
-        </div>
-      ) : null}
+function AdMedia({ ad }: { ad: AdConfig }) {
+  if (ad.kind === "text") return null;
+  if (!ad.mediaUrl) return <PlaceholderMedia />;
+
+  if (ad.kind === "video") {
+    return (
+      <div className="relative overflow-hidden rounded-card border border-border-soft bg-bg-subtle">
+        <video
+          className="aspect-[16/9] w-full object-cover"
+          src={ad.mediaUrl}
+          preload="metadata"
+          controls
+          playsInline
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative overflow-hidden rounded-card border border-border-soft bg-bg-subtle">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img className="aspect-[16/9] w-full object-cover" src={ad.mediaUrl} alt={ad.title} loading="lazy" />
     </div>
   );
 }
 
 export function AdPlacements({
   title = "Publicités",
-  placements = defaultPlacements,
+  placementKey = "home",
 }: {
   title?: string;
-  placements?: AdPlacement[];
+  placementKey?: AdPlacementKey;
 }) {
+  const ads = useAdsData();
+  const placements = useMemo(() => {
+    return ads.filter((a) => Array.isArray(a.placements) && a.placements.includes(placementKey)).slice(0, 3);
+  }, [ads, placementKey]);
+
+  if (placements.length === 0) return null;
+
   return (
     <section>
       <p className="text-xs uppercase tracking-[0.12em] text-text-muted">{title}</p>
@@ -86,11 +105,11 @@ export function AdPlacements({
             aria-label={`${ad.title} — ${ad.ctaLabel}`}
             className="group rounded-modal border border-border-soft bg-bg-surface p-5 shadow-soft transition duration-200 ease-premium hover:translate-y-[-2px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
           >
-            <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-text-muted">{ad.eyebrow}</p>
+            <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-text-muted">{ad.eyebrow || "Annonce"}</p>
 
             {ad.kind === "text" ? null : (
               <div className="mt-4">
-                <PlaceholderMedia kind={ad.kind} />
+                <AdMedia ad={ad} />
               </div>
             )}
 
@@ -109,42 +128,79 @@ export function AdPlacements({
 }
 
 export function InlineAdBanner({
-  eyebrow = "Annonce",
-  title = "Espace publicité",
-  body = "Bannière horizontale (image + texte).",
-  ctaLabel = "En savoir plus",
-  href = "/shop",
+  placementKey,
+  eyebrow,
+  title,
+  body,
+  ctaLabel,
+  href,
 }: {
+  placementKey?: Exclude<AdPlacementKey, "home">;
   eyebrow?: string;
   title?: string;
   body?: string;
   ctaLabel?: string;
   href?: string;
 }) {
+  const ads = useAdsData();
+
+  const derived = useMemo(() => {
+    if (!placementKey) return null;
+    return ads.find((a) => Array.isArray(a.placements) && a.placements.includes(placementKey)) || null;
+  }, [ads, placementKey]);
+
+  const finalEyebrow = derived?.eyebrow || eyebrow || "Annonce";
+  const finalTitle = derived?.title || title || "Espace publicité";
+  const finalBody = derived?.body || body || "Bannière horizontale (image + texte).";
+  const finalCta = derived?.ctaLabel || ctaLabel || "En savoir plus";
+  const finalHref = derived?.href || href || "/shop";
+  const mediaUrl = derived?.mediaUrl;
+  const kind = derived?.kind;
+
+  if (placementKey && !derived) return null;
+
   return (
     <Link
-      href={href}
-      aria-label={`${title} — ${ctaLabel}`}
+      href={finalHref}
+      aria-label={`${finalTitle} — ${finalCta}`}
       className="group block overflow-hidden rounded-modal border border-border-soft bg-bg-surface shadow-soft transition duration-200 ease-premium hover:translate-y-[-2px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
     >
       <div className="grid grid-cols-1 gap-4 p-5 md:grid-cols-12 md:items-center">
         <div className="md:col-span-5">
-          <div
-            className="aspect-[16/9] rounded-card border border-border-soft bg-bg-subtle"
-            aria-hidden
-            style={{
-              background:
-                "radial-gradient(80% 80% at 20% 20%, rgba(0,0,0,0.10), rgba(0,0,0,0)), radial-gradient(70% 70% at 75% 75%, rgba(0,0,0,0.10), rgba(0,0,0,0))",
-            }}
-          />
+          {kind === "video" && mediaUrl ? (
+            <div className="relative overflow-hidden rounded-card border border-border-soft bg-bg-subtle">
+              <video
+                className="aspect-[16/9] w-full object-cover"
+                src={mediaUrl}
+                preload="metadata"
+                muted
+                playsInline
+                controls
+              />
+            </div>
+          ) : kind === "image" && mediaUrl ? (
+            <div className="relative overflow-hidden rounded-card border border-border-soft bg-bg-subtle">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img className="aspect-[16/9] w-full object-cover" src={mediaUrl} alt={finalTitle} loading="lazy" />
+            </div>
+          ) : (
+            <div
+              className="aspect-[16/9] rounded-card border border-border-soft bg-bg-subtle"
+              aria-hidden
+              style={{
+                background:
+                  "radial-gradient(80% 80% at 20% 20%, rgba(0,0,0,0.10), rgba(0,0,0,0)), radial-gradient(70% 70% at 75% 75%, rgba(0,0,0,0.10), rgba(0,0,0,0))",
+              }}
+            />
+          )}
         </div>
 
         <div className="md:col-span-7">
-          <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-text-muted">{eyebrow}</p>
-          <p className="mt-2 font-serif text-2xl tracking-tight-luxe-sm text-text-primary">{title}</p>
-          <p className="mt-2 text-sm leading-6 text-text-muted">{body}</p>
+          <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-text-muted">{finalEyebrow}</p>
+          <p className="mt-2 font-serif text-2xl tracking-tight-luxe-sm text-text-primary">{finalTitle}</p>
+          <p className="mt-2 text-sm leading-6 text-text-muted">{finalBody}</p>
           <p className="mt-4 text-sm font-medium text-text-primary">
-            {ctaLabel}{" "}
+            {finalCta}{" "}
             <span className="transition duration-200 ease-premium group-hover:translate-x-0.5">→</span>
           </p>
         </div>

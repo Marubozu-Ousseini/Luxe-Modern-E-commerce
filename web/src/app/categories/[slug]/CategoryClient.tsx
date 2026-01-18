@@ -98,13 +98,7 @@ export function CategoryClient({ slug, config }: { slug: string; config: Categor
       </div>
 
       <div className="mt-8">
-        <InlineAdBanner
-          eyebrow="Annonce"
-          title="Espace publicité — image / texte / vidéo"
-          body="Emplacement prévu pour une annonce de catégorie. Pour une vidéo courte, utilisez un format 16:9 avec un poster léger."
-          ctaLabel="Voir plus"
-          href="/shop"
-        />
+        <InlineAdBanner placementKey="category" />
       </div>
 
       <div className="mt-10">

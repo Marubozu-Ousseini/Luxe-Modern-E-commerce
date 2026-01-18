@@ -69,6 +69,30 @@ router.get('/*', async (req, res) => {
     res.setHeader('Content-Type', meta.contentType || 'application/octet-stream');
     res.setHeader('Cache-Control', meta.cacheControl || 'public, max-age=31536000, s-maxage=31536000');
 
+    const size = meta.size ? Number(meta.size) : NaN;
+    res.setHeader('Accept-Ranges', 'bytes');
+
+    const range = String(req.headers.range || '');
+    const hasValidSize = Number.isFinite(size) && size > 0;
+    if (range && hasValidSize) {
+      const m = range.match(/bytes=(\d+)-(\d*)/);
+      if (m) {
+        const start = Number(m[1]);
+        const endRaw = m[2] ? Number(m[2]) : NaN;
+        const end = Number.isFinite(endRaw) ? Math.min(endRaw, size - 1) : size - 1;
+        if (Number.isFinite(start) && start >= 0 && end >= start && end < size) {
+          res.status(206);
+          res.setHeader('Content-Range', `bytes ${start}-${end}/${size}`);
+          res.setHeader('Content-Length', String(end - start + 1));
+          const stream = file.createReadStream({ start, end });
+          stream.on('error', (_err) => {
+            if (!res.headersSent) res.status(500).end('Stream error');
+          });
+          return stream.pipe(res);
+        }
+      }
+    }
+
     const stream = file.createReadStream();
     stream.on('error', (_err) => {
       if (!res.headersSent) res.status(500).end('Stream error');

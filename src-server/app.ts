@@ -21,6 +21,7 @@ import proxyRoutes from './api/proxy.js';
 import heroImagesRoutes from './api/hero-images.js';
 import siteSettingsRoutes from './api/site-settings.js';
 import mediaRoutes from './api/media.js';
+import adsRoutes from './api/ads.js';
 import { isDbAvailable } from './services/db.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -123,6 +124,7 @@ app.use('/api/cart', cartRoutes);
 app.use('/api/favorites', favoritesRoutes);
 app.use('/api/hero-images', heroImagesRoutes);
 app.use('/api/site-settings', siteSettingsRoutes);
+app.use('/api/ads', adsRoutes);
 app.use('/api/media', mediaRoutes);
 app.use('/proxy', proxyRoutes);
 
