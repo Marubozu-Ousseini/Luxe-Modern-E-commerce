@@ -218,7 +218,7 @@ router.put('/site-settings', async (req, res) => {
     if (!parsed.success) {
       return res.status(400).json({ message: 'Champs invalides', details: parsed.error.flatten() });
     }
-    await setSiteSettings(parsed.data);
+    await setSiteSettings(parsed.data as any);
     return res.json({ ok: true });
   } catch (e: any) {
     // eslint-disable-next-line no-console
@@ -284,12 +284,31 @@ router.post('/produits', async (req, res) => {
     originalPrice: z.number().positive().optional(),
     description: z.string().min(1),
     category: z.string().min(1),
-    imageUrl: z.string().url(),
+    imageUrl: z
+      .string()
+      .min(1)
+      .max(500)
+      .refine(
+        (v) => {
+          const s = String(v || '').trim();
+          if (!s) return false;
+          // Prefer domain-agnostic, public proxy URL
+          if (s.startsWith('/api/media/')) return true;
+          // Allow absolute URLs for backwards compatibility
+          if (s.startsWith('https://') || s.startsWith('http://')) return true;
+          return false;
+        },
+        { message: 'imageUrl invalide (utilisez /api/media/...)' }
+      ),
     stock: z.number().int().nonnegative().optional(),
   });
   const parse = schema.safeParse(req.body);
   if (!parse.success) return res.status(400).json({ message: 'Champs invalides', details: parse.error.flatten() });
   const { name, price, originalPrice, description, category, imageUrl, stock } = parse.data;
+
+  if (String(imageUrl).startsWith('/api/admin/object/')) {
+    return res.status(400).json({ message: 'imageUrl doit être public (/api/media/...)' });
+  }
   const product = isProductsPersistenceAvailable()
     ? await addProductAsync({ name, price, originalPrice, description, category, imageUrl, stock })
     : addProduct({ name, price, originalPrice, description, category, imageUrl, stock });
