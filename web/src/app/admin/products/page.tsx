@@ -443,6 +443,26 @@ export default function AdminProductsPage() {
                       <div key={idx} className="relative overflow-hidden rounded-card border border-border-soft bg-bg-subtle">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={url} alt={`Aperçu ${idx + 1}`} className="h-32 w-full object-cover" />
+                        {idx !== 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const picked = imageFiles[idx];
+                              if (!picked) return;
+                              const rest = imageFiles.filter((_, i) => i !== idx);
+                              setImageFiles([picked, ...rest]);
+                            }}
+                            className="absolute left-2 top-2 rounded-card bg-bg-surface/90 px-2 py-1 text-xs font-medium text-text-primary shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                            aria-label="Définir comme image par défaut"
+                            title="Définir comme image par défaut"
+                          >
+                            Par défaut
+                          </button>
+                        ) : (
+                          <span className="absolute left-2 top-2 rounded-card bg-bg-surface/90 px-2 py-1 text-xs font-medium text-text-primary shadow-soft">
+                            Défaut
+                          </span>
+                        )}
                         <button
                           type="button"
                           onClick={() => {
@@ -813,6 +833,34 @@ export default function AdminProductsPage() {
                                     ) : null}
                                   </div>
 
+                                  {gallery.length > 1 ? (
+                                    <div className="mt-3">
+                                      <label className="block">
+                                        <span className="text-xs uppercase tracking-[0.12em] text-text-muted">Image par défaut</span>
+                                        <select
+                                          value={gallery[0]}
+                                          onChange={(e) => {
+                                            const selected = e.target.value;
+                                            if (!selected || selected === gallery[0]) return;
+                                            const nextImages = [selected, ...gallery.filter((u) => u !== selected)];
+                                            void updateRemoteProduct(p.id, { images: nextImages as any }).catch((err: any) => {
+                                              setAuthStatus(err?.message || "Impossible de définir l'image par défaut.");
+                                            });
+                                          }}
+                                          className="mt-2 w-full rounded-card border border-border-soft bg-bg-surface px-4 py-2 text-sm text-text-primary shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                                          aria-label={`Image par défaut ${p.name}`}
+                                        >
+                                          {gallery.map((url, idx) => (
+                                            <option key={`${p.id}-${idx}`} value={url}>
+                                              Image {idx + 1}{idx === 0 ? " (défaut)" : ""}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      </label>
+                                      <p className="mt-2 text-xs text-text-muted">La première image est celle utilisée comme image principale.</p>
+                                    </div>
+                                  ) : null}
+
                                   <div className="mt-3">
                                     <input
                                       type="file"
@@ -824,7 +872,7 @@ export default function AdminProductsPage() {
                                         void (async () => {
                                           try {
                                             const urls = await uploadImages(files);
-                                            await updateRemoteProduct(p.id, { images: urls as any, imageUrl: urls[0] } as any);
+                                            await updateRemoteProduct(p.id, { images: urls as any } as any);
                                             setAuthStatus("");
                                           } catch (err: any) {
                                             setAuthStatus(err?.message || "Impossible de mettre à jour les images.");
