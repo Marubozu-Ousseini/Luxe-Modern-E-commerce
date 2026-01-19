@@ -69,11 +69,12 @@ export default function AdminSettingsPage() {
   );
 
   function updateHeroImages(updater: (prev: HeroImages) => HeroImages) {
-    setHeroImages((prev) => {
-      const next = updater(prev);
-      heroImagesRef.current = next;
-      return next;
-    });
+    // React state updates are batched; relying on the functional updater to run
+    // before reading `heroImagesRef.current` can lead to stale snapshots.
+    // Use the ref as the source of truth and update it synchronously.
+    const next = updater(heroImagesRef.current);
+    heroImagesRef.current = next;
+    setHeroImages(next);
   }
 
   function isBlobUrl(url: string) {
