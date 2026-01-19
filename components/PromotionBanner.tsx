@@ -49,7 +49,15 @@ export default function PromotionBanner() {
         <div className="flex items-center gap-3">
           {stickers.slice(0,2).map(s => (
             s.href ? (
-              <a key={s.id} href={s.href} onClick={()=> track({ type: 'promo_click', payload: { id: s.id } })} className="inline-flex items-center justify-center" style={{ textDecoration: 'none' }}>
+              <a
+                key={s.id}
+                href={s.href}
+                target="_blank"
+                rel="noreferrer noopener"
+                onClick={()=> track({ type: 'promo_click', payload: { id: s.id } })}
+                className="inline-flex items-center justify-center"
+                style={{ textDecoration: 'none' }}
+              >
                 {s.imageUrl ? <img src={s.imageUrl} alt={s.text || s.id} className="h-6 w-6 object-contain" /> : (s.text || s.id)}
               </a>
             ) : (

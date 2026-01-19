@@ -14,7 +14,13 @@ const AdBanner: React.FC = () => {
         <span className="truncate">{text}</span>
       </div>
     );
-    return link ? <a href={link} className="block hover:opacity-90">{inner}</a> : inner;
+    return link ? (
+      <a href={link} target="_blank" rel="noreferrer noopener" className="block hover:opacity-90">
+        {inner}
+      </a>
+    ) : (
+      inner
+    );
   };
   return (
     <div className="mx-auto max-w-content px-4 sm:px-6 lg:px-8 mt-3 mb-5 space-y-2">
