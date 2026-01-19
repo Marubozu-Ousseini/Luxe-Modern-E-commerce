@@ -10,6 +10,20 @@ import {
   type AdPlacementKey,
 } from "@/lib/ads";
 
+function normalizeAdHref(rawHref: string): { href: string; isExternal: boolean } {
+  const trimmed = String(rawHref || "").trim();
+  if (!trimmed) return { href: "/shop", isExternal: false };
+  if (/^https?:\/\//i.test(trimmed)) return { href: trimmed, isExternal: true };
+
+  // If the admin entered a bare domain like "www.example.com" or "example.com",
+  // browsers treat it as a relative path. Normalize to an absolute https URL.
+  const looksLikeDomain =
+    /^www\./i.test(trimmed) || /^[a-z0-9.-]+\.[a-z]{2,}(\/|$)/i.test(trimmed);
+  if (looksLikeDomain) return { href: `https://${trimmed.replace(/^\/+/, "")}`, isExternal: true };
+
+  return { href: trimmed, isExternal: false };
+}
+
 function useAdsData() {
   const [ads, setAds] = useState<AdConfig[]>(() => {
     try {
@@ -98,30 +112,47 @@ export function AdPlacements({
       <p className="text-xs uppercase tracking-[0.12em] text-text-muted">{title}</p>
 
       <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3">
-        {placements.map((ad) => (
-          <Link
-            key={`${ad.kind}-${ad.title}`}
-            href={ad.href}
-            aria-label={`${ad.title} — ${ad.ctaLabel}`}
-            className="group rounded-modal border border-border-soft bg-bg-surface p-5 shadow-soft transition duration-200 ease-premium hover:translate-y-[-2px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-          >
-            <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-text-muted">{ad.eyebrow || "Annonce"}</p>
+        {placements.map((ad) => {
+          const { href, isExternal } = normalizeAdHref(ad.href);
+          const className =
+            "group rounded-modal border border-border-soft bg-bg-surface p-5 shadow-soft transition duration-200 ease-premium hover:translate-y-[-2px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40";
+          const inner = (
+            <>
+              <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-text-muted">{ad.eyebrow || "Annonce"}</p>
 
-            {ad.kind === "text" ? null : (
-              <div className="mt-4">
-                <AdMedia ad={ad} />
-              </div>
-            )}
+              {ad.kind === "text" ? null : (
+                <div className="mt-4">
+                  <AdMedia ad={ad} />
+                </div>
+              )}
 
-            <p className="mt-4 font-serif text-xl tracking-tight-luxe-sm text-text-primary">{ad.title}</p>
-            <p className="mt-2 text-sm leading-6 text-text-muted">{ad.body}</p>
+              <p className="mt-4 font-serif text-xl tracking-tight-luxe-sm text-text-primary">{ad.title}</p>
+              <p className="mt-2 text-sm leading-6 text-text-muted">{ad.body}</p>
 
-            <p className="mt-5 text-sm font-medium text-text-primary">
-              {ad.ctaLabel}{" "}
-              <span className="transition duration-200 ease-premium group-hover:translate-x-0.5">→</span>
-            </p>
-          </Link>
-        ))}
+              <p className="mt-5 text-sm font-medium text-text-primary">
+                {ad.ctaLabel}{" "}
+                <span className="transition duration-200 ease-premium group-hover:translate-x-0.5">→</span>
+              </p>
+            </>
+          );
+
+          return isExternal ? (
+            <a
+              key={`${ad.kind}-${ad.title}`}
+              href={href}
+              target="_blank"
+              rel="noreferrer noopener"
+              aria-label={`${ad.title} — ${ad.ctaLabel}`}
+              className={className}
+            >
+              {inner}
+            </a>
+          ) : (
+            <Link key={`${ad.kind}-${ad.title}`} href={href} aria-label={`${ad.title} — ${ad.ctaLabel}`} className={className}>
+              {inner}
+            </Link>
+          );
+        })}
       </div>
     </section>
   );
@@ -159,13 +190,12 @@ export function InlineAdBanner({
 
   if (placementKey && !derived) return null;
 
-  return (
-    <Link
-      href={finalHref}
-      aria-label={`${finalTitle} — ${finalCta}`}
-      className="group block overflow-hidden rounded-modal border border-border-soft bg-bg-surface shadow-soft transition duration-200 ease-premium hover:translate-y-[-2px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-    >
-      <div className="grid grid-cols-1 gap-4 p-5 md:grid-cols-12 md:items-center">
+  const { href: resolvedHref, isExternal } = normalizeAdHref(finalHref);
+  const wrapperClassName =
+    "group block overflow-hidden rounded-modal border border-border-soft bg-bg-surface shadow-soft transition duration-200 ease-premium hover:translate-y-[-2px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40";
+
+  const content = (
+    <div className="grid grid-cols-1 gap-4 p-5 md:grid-cols-12 md:items-center">
         <div className="md:col-span-5">
           {kind === "video" && mediaUrl ? (
             <div className="relative overflow-hidden rounded-card border border-border-soft bg-bg-subtle">
@@ -205,6 +235,21 @@ export function InlineAdBanner({
           </p>
         </div>
       </div>
+  );
+
+  return isExternal ? (
+    <a
+      href={resolvedHref}
+      target="_blank"
+      rel="noreferrer noopener"
+      aria-label={`${finalTitle} — ${finalCta}`}
+      className={wrapperClassName}
+    >
+      {content}
+    </a>
+  ) : (
+    <Link href={resolvedHref} aria-label={`${finalTitle} — ${finalCta}`} className={wrapperClassName}>
+      {content}
     </Link>
   );
 }
