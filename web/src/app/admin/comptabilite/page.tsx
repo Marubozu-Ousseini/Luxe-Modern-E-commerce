@@ -1,19 +1,19 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { subscribeToAuthState } from "@/lib/firebaseClient";
 import { cn } from "@/lib/cn";
 import { formatXaf } from "@/lib/money";
 
-type PaymentStatus = "Commandée" | "Payée";
-type OrderStatus = "En attente" | "Expédiée" | "Livrée" | "Annulée";
+type ApiOrderStatus = "paid" | "pending" | "failed";
 
-type AdminOrder = {
+type ApiOrder = {
   id: string;
-  date: string;
-  customer: string;
-  totalXaf: string;
-  payment: PaymentStatus;
-  status: OrderStatus;
+  userId: string;
+  total: number;
+  status: ApiOrderStatus;
+  adminConfirmed?: boolean;
+  createdAt?: string;
 };
 
 type AccountingRow = {
@@ -31,7 +31,6 @@ type AccountingRow = {
 type SortKey = "number" | "product" | "quantity" | "unitPrice" | "totalPrice" | "notes";
 type SortDir = "asc" | "desc";
 
-const ORDERS_KEY = "malafaareh_admin_orders";
 const MONTHS_KEY = "malafaareh_admin_accounting_months_v2";
 
 function currentMonthKey() {
@@ -67,43 +66,25 @@ function safeParseMonths(value: string | null): string[] {
   }
 }
 
-function safeParseOrders(value: string | null): AdminOrder[] {
-  if (!value) return [];
+function formatDateFr(iso?: string): string {
+  if (!iso) return "";
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return iso;
   try {
-    const parsed = JSON.parse(value) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .filter(Boolean)
-      .map((o) => o as Partial<AdminOrder>)
-      .filter(
-        (o): o is AdminOrder =>
-          typeof o.id === "string" &&
-          typeof o.date === "string" &&
-          typeof o.customer === "string" &&
-          typeof o.totalXaf === "string" &&
-          (o.payment === "Commandée" || o.payment === "Payée") &&
-          (o.status === "En attente" || o.status === "Expédiée" || o.status === "Livrée" || o.status === "Annulée")
-      );
+    return new Date(t).toLocaleDateString("fr-FR");
   } catch {
-    return [];
+    return iso;
   }
 }
 
-function parseDdMmYyyyToMonthKey(input: string): string | null {
-  const parts = input.split("/");
-  if (parts.length !== 3) return null;
-  const dd = Number(parts[0]);
-  const mm = Number(parts[1]);
-  const yyyy = Number(parts[2]);
-  if (!Number.isFinite(dd) || !Number.isFinite(mm) || !Number.isFinite(yyyy)) return null;
-  if (yyyy < 2000 || mm < 1 || mm > 12 || dd < 1 || dd > 31) return null;
-  return `${yyyy}-${String(mm).padStart(2, "0")}`;
-}
-
-function parseXafAmount(input: string): number {
-  const digits = input.replace(/[^0-9]/g, "");
-  const n = Number(digits);
-  return Number.isFinite(n) ? n : 0;
+function parseIsoToMonthKey(input?: string): string | null {
+  if (!input) return null;
+  const t = Date.parse(input);
+  if (!Number.isFinite(t)) return null;
+  const d = new Date(t);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  return `${y}-${m}`;
 }
 
 function downloadBlob(filename: string, blob: Blob) {
@@ -133,22 +114,55 @@ export default function AdminComptabilitePage() {
   const [sortDir, setSortDir] = useState<SortDir>("asc");
 
   const [status, setStatus] = useState<string>("");
-  const [orders, setOrders] = useState<AdminOrder[]>([]);
+  const [orders, setOrders] = useState<ApiOrder[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string>("");
+  const [authRequired, setAuthRequired] = useState(false);
+
+  async function getAdminAuthHeaders(extra?: Record<string, string>): Promise<Record<string, string>> {
+    const auth = await import("@/lib/firebaseClient").then((m) => m.getFirebaseAuth());
+    const user = auth.currentUser;
+    if (!user) throw new Error("Connexion requise");
+    const idToken = await user.getIdToken();
+    return {
+      accept: "application/json",
+      authorization: `Bearer ${idToken}`,
+      ...(extra || {}),
+    };
+  }
+
+  async function refreshOrders() {
+    setLoading(true);
+    setLoadError("");
+    try {
+      const headers = await getAdminAuthHeaders();
+      const res = await fetch("/api/admin/orders", { headers, credentials: "include" });
+      if (res.status === 401 || res.status === 403) {
+        setAuthRequired(true);
+        setOrders([]);
+        return;
+      }
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.message || "Impossible de charger les commandes.");
+      }
+      const data = (await res.json()) as ApiOrder[];
+      setOrders(Array.isArray(data) ? data : []);
+      setAuthRequired(false);
+    } catch (e: any) {
+      setAuthRequired(true);
+      setOrders([]);
+      setLoadError(e?.message || "Impossible de charger les commandes.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
     try {
       const storedMonths = safeParseMonths(localStorage.getItem(MONTHS_KEY));
-      const storedOrders = safeParseOrders(localStorage.getItem(ORDERS_KEY));
-      setOrders(storedOrders);
-
-      const orderMonths = new Set<string>();
-      for (const o of storedOrders) {
-        const mk = parseDdMmYyyyToMonthKey(o.date);
-        if (mk) orderMonths.add(mk);
-      }
-
       const now = currentMonthKey();
-      const combined = Array.from(new Set<string>([...storedMonths, ...orderMonths, now]))
+      const combined = Array.from(new Set<string>([...storedMonths, now]))
         .filter((m) => /^\d{4}-\d{2}$/.test(m))
         .sort()
         .reverse();
@@ -165,7 +179,38 @@ export default function AdminComptabilitePage() {
       setSelectedMonths([now]);
       setMonthToAdd(now);
     }
+    void refreshOrders();
+    const unsub = subscribeToAuthState(() => {
+      void refreshOrders();
+    });
+    return () => unsub();
   }, []);
+
+  useEffect(() => {
+    const eligible = orders.filter((o) => o.status === "paid" || Boolean(o.adminConfirmed));
+    const orderMonths = new Set<string>();
+    for (const o of eligible) {
+      const mk = parseIsoToMonthKey(o.createdAt) ?? currentMonthKey();
+      if (mk) orderMonths.add(mk);
+    }
+
+    const now = currentMonthKey();
+    const combined = Array.from(new Set<string>([...months, ...Array.from(orderMonths), now]))
+      .filter((m) => /^\d{4}-\d{2}$/.test(m))
+      .sort()
+      .reverse();
+    if (combined.length === 0) return;
+    if (combined.join("|") !== months.join("|")) persistMonths(combined);
+
+    setActiveMonth((prev) => (combined.includes(prev) ? prev : combined[0] ?? now));
+    setSelectedMonths((prev) => {
+      const kept = prev.filter((m) => combined.includes(m));
+      if (kept.length > 0) return kept;
+      const initial = combined[0] ?? now;
+      return [initial];
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orders]);
 
   function persistMonths(nextMonths: string[]) {
     setMonths(nextMonths);
@@ -229,23 +274,25 @@ export default function AdminComptabilitePage() {
 
   const rows = useMemo<AccountingRow[]>(() => {
     const wanted = new Set(selectedMonths);
-    const paidOrders = orders.filter((o) => o.payment === "Payée");
+    const eligibleOrders = orders.filter((o) => o.status === "paid" || Boolean(o.adminConfirmed));
 
     const out: AccountingRow[] = [];
-    for (const o of paidOrders) {
-      const monthKey = parseDdMmYyyyToMonthKey(o.date) ?? currentMonthKey();
+    for (const o of eligibleOrders) {
+      const monthKey = parseIsoToMonthKey(o.createdAt) ?? currentMonthKey();
       if (!wanted.has(monthKey)) continue;
-      const total = parseXafAmount(o.totalXaf);
+      const total = Number(o.total) || 0;
+      const paidLabel = o.status === "paid" ? "Payée" : "En attente";
+      const shipLabel = o.adminConfirmed ? "Expédition confirmée" : "Non confirmée";
       out.push({
         id: o.id,
         monthKey,
-        date: o.date,
+        date: formatDateFr(o.createdAt),
         number: o.id,
         product: "Commande",
         quantity: 1,
         unitPriceXaf: total,
         totalPriceXaf: total,
-        notes: `${o.customer} · ${o.payment} · ${o.status}`,
+        notes: `${o.userId} · ${paidLabel} · ${shipLabel}`,
       });
     }
     return out;
@@ -328,6 +375,16 @@ export default function AdminComptabilitePage() {
         </p>
       </div>
 
+      {authRequired && (
+        <div className="mt-6 rounded-modal border border-border-soft bg-bg-surface p-6 shadow-soft text-sm">
+          Connexion admin requise (Firebase). Ouvrez l'admin et reconnectez-vous.
+        </div>
+      )}
+
+      {loadError ? (
+        <div className="mt-6 rounded-modal border border-red-200 bg-red-50 p-6 shadow-soft text-sm text-red-700">{loadError}</div>
+      ) : null}
+
       <div className="mt-6 rounded-modal border border-border-soft bg-bg-surface p-6 shadow-soft">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
@@ -407,7 +464,7 @@ export default function AdminComptabilitePage() {
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-sm font-medium text-text-primary">Résumé mensuel</p>
-            <p className="mt-1 text-xs text-text-muted">Basé sur les commandes payées</p>
+            <p className="mt-1 text-xs text-text-muted">Basé sur les commandes payées ou expédition confirmée</p>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -529,7 +586,7 @@ export default function AdminComptabilitePage() {
               {sortedRows.length === 0 ? (
                 <tr className="border-t border-border-soft">
                   <td colSpan={6} className="px-6 py-8 text-sm text-text-muted">
-                    Aucune ligne pour la sélection actuelle (commandes payées).
+                    Aucune ligne pour la sélection actuelle (payées / expédition confirmée).
                   </td>
                 </tr>
               ) : (

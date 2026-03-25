@@ -4,14 +4,67 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { HeroImage } from "@/components/layout/HeroImage";
+import { PasswordInput } from "@/components/ui/PasswordInput";
+import { normalizeCameroonPhone } from "@/lib/phone";
+import { signUpEmailPassword, syncUserToServer } from "@/lib/firebaseClient";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [town, setTown] = useState("");
+  const [password, setPassword] = useState("");
+  const [status, setStatus] = useState<string>("");
+  const [submitting, setSubmitting] = useState(false);
 
-  function onSubmit(e: React.FormEvent) {
+  async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    router.push("/account");
+    setStatus("");
+
+    const nextName = name.trim();
+    const nextEmail = email.trim();
+    const nextTown = town.trim();
+    const nextPassword = password;
+    const formattedPhone = normalizeCameroonPhone(phone.trim());
+
+    if (!nextName) {
+      setStatus("Nom requis.");
+      return;
+    }
+    if (!nextEmail) {
+      setStatus("Email requis.");
+      return;
+    }
+    if (!formattedPhone) {
+      setStatus("Téléphone invalide (ex: +237 6 99 99 99 99 ou 699999999). ");
+      return;
+    }
+    if (!nextTown) {
+      setStatus("Ville requise.");
+      return;
+    }
+    if (!nextPassword.trim()) {
+      setStatus("Mot de passe requis.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const user = await signUpEmailPassword(nextEmail, nextPassword, nextName);
+      try {
+        localStorage.setItem("malafaareh_phone", formattedPhone);
+        localStorage.setItem("malafaareh_town", nextTown);
+      } catch {
+        // ignore
+      }
+      await syncUserToServer(user, { name: nextName, phone: formattedPhone, town: nextTown });
+      router.push("/shop");
+    } catch (err: any) {
+      setStatus(err?.message || "Inscription impossible.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -29,7 +82,21 @@ export default function RegisterPage() {
           </div>
         </div>
 
-        <form onSubmit={onSubmit} className="mt-8 max-w-md">
+        <form onSubmit={onSubmit} className="mt-8 max-w-md space-y-4">
+          {status ? <p className="rounded-card border border-border-soft bg-bg-subtle px-4 py-3 text-sm text-text-muted">{status}</p> : null}
+
+          <label className="block text-sm text-text-primary">
+            Nom
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              type="text"
+              required
+              className="mt-2 w-full rounded-card border border-border-soft bg-bg-subtle px-4 py-3 text-sm text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+              placeholder="Votre nom"
+            />
+          </label>
+
           <label className="block text-sm text-text-primary">
             Email
             <input
@@ -42,15 +109,52 @@ export default function RegisterPage() {
             />
           </label>
 
+          <label className="block text-sm text-text-primary">
+            Téléphone
+            <input
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              onBlur={() => {
+                const formatted = normalizeCameroonPhone(phone);
+                if (formatted) setPhone(formatted);
+              }}
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              required
+              title="Exemples : +237 6 99 99 99 99 ou 699999999"
+              className="mt-2 w-full rounded-card border border-border-soft bg-bg-subtle px-4 py-3 text-sm text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+              placeholder="+237 0 00 00 00 00"
+            />
+          </label>
+
+          <label className="block text-sm text-text-primary">
+            Ville
+            <input
+              value={town}
+              onChange={(e) => setTown(e.target.value)}
+              type="text"
+              required
+              className="mt-2 w-full rounded-card border border-border-soft bg-bg-subtle px-4 py-3 text-sm text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+              placeholder="Votre ville"
+            />
+          </label>
+
+          <label className="block text-sm text-text-primary">
+            Mot de passe
+            <PasswordInput
+              value={password}
+              onChange={(e) => setPassword((e.target as HTMLInputElement).value)}
+              placeholder="Mot de passe"
+              className="mt-2 w-full"
+            />
+          </label>
+
           <div className="mt-6">
-            <Button type="submit" className="w-full">
+            <Button type="submit" className="w-full" disabled={submitting}>
               Créer mon compte
             </Button>
           </div>
-
-          <p className="mt-3 text-xs text-text-muted">
-            Vous serez redirigé vers la page Compte pour saisir aussi votre téléphone et votre ville.
-          </p>
         </form>
       </div>
     </div>

@@ -128,7 +128,7 @@ export function ProductCard({ product }: { product: Product }) {
 
           {isOutOfStock ? (
             <div className="pointer-events-none absolute inset-0 grid place-items-center">
-              <div className="-rotate-12 rounded-card border-4 border-promo-old/55 bg-promo-old/10 px-7 py-4 text-center text-2xl font-black uppercase tracking-[0.18em] text-promo-old/70 mix-blend-multiply shadow-soft sm:text-3xl md:text-4xl">
+              <div className="-rotate-12 rounded-card border-4 border-red-600/70 bg-red-100/80 px-10 py-6 text-center text-4xl font-black uppercase tracking-[0.18em] text-red-700 mix-blend-multiply shadow-lg sm:text-5xl md:text-6xl">
                 Rupture de stock
               </div>
             </div>

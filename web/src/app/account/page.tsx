@@ -144,6 +144,21 @@ export default function AccountPage() {
         const auth = await getFirebaseAuth();
         const user = auth.currentUser;
         if (user) {
+          try {
+            const idToken = await user.getIdToken();
+            await fetch("/api/auth/me", {
+              method: "PATCH",
+              headers: {
+                accept: "application/json",
+                "content-type": "application/json",
+                authorization: `Bearer ${idToken}`,
+              },
+              credentials: "include",
+              body: JSON.stringify({ name: nextName, phone: formattedPhone, town: nextTown }),
+            });
+          } catch {
+            // Non-bloquant
+          }
           await syncUserToServer(user, { name: nextName, phone: formattedPhone, town: nextTown });
         }
       } catch {

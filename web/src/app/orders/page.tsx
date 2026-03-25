@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { HeroImage } from "@/components/layout/HeroImage";
-import { ORDER_HISTORY_KEY, safeParseOrderHistory, type OrderHistoryItem } from "@/lib/orderHistory";
+import { PromoPrice } from "@/components/ui/PromoPrice";
+import { ORDER_HISTORY_KEY, safeParseOrderHistory } from "@/lib/orderHistory";
 import { subscribeToAuthState } from "@/lib/firebaseClient";
 import { fetchStorefrontProducts } from "@/lib/storefrontProducts";
 import type { Product } from "@/lib/products";
@@ -17,6 +18,24 @@ type ApiOrder = {
   createdAt: string;
   discountApplied?: number;
   couponCode?: string;
+  address?: string;
+  town?: string;
+  shippingAddress?: string;
+};
+
+type OrderHistoryItem = {
+  orderNumber: string;
+  createdAtIso: string;
+  paymentMethodLabel: string;
+  totalXaf: number;
+  discountApplied?: number;
+  address?: string;
+  items: Array<{
+    slug: string;
+    name: string;
+    quantity: number;
+    priceXaf: number;
+  }>;
 };
 
 export default function OrdersPage() {
@@ -66,11 +85,15 @@ export default function OrdersPage() {
 
       const mapped: OrderHistoryItem[] = apiOrders.map((o) => {
         const paymentMethodLabel = o.paymentMethod === "mtn_mobile_money" ? "MTN Mobile Money" : o.paymentMethod === "orange_money" ? "Orange Money" : "Paiement";
+        // Fetch user address (town) if available
+        const address = o.address || o.town || o.shippingAddress || "";
         return {
           orderNumber: o.id,
           createdAtIso: o.createdAt,
           paymentMethodLabel,
           totalXaf: o.total,
+          discountApplied: o.discountApplied || 0,
+          address,
           items: (o.items || []).map((it) => {
             const p = productById.get(it.productId);
             return {
@@ -102,6 +125,7 @@ export default function OrdersPage() {
       dateLabel: new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(o.createdAtIso)),
       totalLabel: `${o.totalXaf.toLocaleString("fr-FR")} XAF`,
       itemCount: o.items.reduce((sum, l) => sum + (l.quantity || 0), 0),
+      address: o.address || "",
     }));
   }, [orders]);
 
@@ -135,17 +159,39 @@ export default function OrdersPage() {
                     <p className="text-xs uppercase tracking-[0.12em] text-text-muted">Commande</p>
                     <p className="mt-1 font-serif text-2xl tracking-tight-luxe-sm">{o.orderNumber}</p>
                     <p className="mt-2 text-sm text-text-muted">{o.dateLabel}</p>
+                    {o.address && (
+                      <p className="mt-2 text-sm text-text-muted">Adresse: {o.address}</p>
+                    )}
                   </div>
                   <div className="text-sm">
                     <p className="text-text-muted">Paiement</p>
                     <p className="font-medium text-text-primary">{o.paymentMethodLabel}</p>
                     <p className="mt-2 text-text-muted">Total</p>
                     <p className="font-medium text-text-primary">{o.totalLabel}</p>
+                    {typeof o.discountApplied === "number" && o.discountApplied > 0 && (
+                      <p className="mt-2 text-sm text-text-muted">Remise: <span className="font-medium text-green-700">{o.discountApplied.toLocaleString("fr-FR")} XAF</span></p>
+                    )}
                   </div>
                 </div>
 
                 <div className="mt-5 border-t border-border-soft pt-4">
-                  <p className="text-sm text-text-muted">Articles: {o.itemCount}</p>
+                  <h2 className="font-serif text-2xl tracking-tight-luxe-sm mb-2">Articles</h2>
+                  <div className="space-y-3">
+                    {o.items.map((l) => (
+                      <div key={l.slug} className="flex items-start justify-between gap-4">
+                        <div>
+                          <p className="text-sm font-medium text-text-primary">{l.name}</p>
+                          <p className="mt-1 text-xs text-text-muted">Qté {l.quantity}</p>
+                        </div>
+                        {/* Reuse PromoPrice for consistent price display */}
+                        <PromoPrice priceXaf={l.priceXaf} quantity={l.quantity} />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-6 flex items-center justify-between">
+                    <p className="text-sm font-medium text-text-primary">Total</p>
+                    <p className="text-sm font-medium text-text-primary">{o.totalXaf.toLocaleString("fr-FR")} XAF</p>
+                  </div>
                 </div>
               </div>
             ))}

@@ -39,6 +39,10 @@ export interface OrderRecord {
   createdAt: string;
 }
 
+export interface OrderDetails extends OrderRecord {
+  subtotal: number;
+}
+
 function ensureDataDir() {
   if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
   if (!fs.existsSync(ordersFile)) fs.writeFileSync(ordersFile, '[]');
@@ -100,6 +104,21 @@ export function getOrdersByUser(userId: string): OrderRecord[] {
   return readOrders().filter(o => o.userId === userId);
 }
 
+export function getOrderById(id: string): OrderRecord | undefined {
+  return readOrders().find((o) => o.id === id);
+}
+
+function computeSubtotal(items: OrderItem[]): number {
+  return (Array.isArray(items) ? items : []).reduce((sum, it) => sum + (Number(it.price) || 0) * (Number(it.quantity) || 0), 0);
+}
+
+export function getOrderDetailsById(id: string): OrderDetails | undefined {
+  const order = getOrderById(id);
+  if (!order) return undefined;
+  const subtotal = computeSubtotal(order.items);
+  return { ...order, subtotal };
+}
+
 // Admin helpers
 export function getAllOrders(): OrderRecord[] {
   return readOrders();
@@ -110,6 +129,21 @@ export function updateOrderStatus(id: string, status: OrderRecord['status']): Or
   const idx = orders.findIndex(o => o.id === id);
   if (idx === -1) return undefined;
   orders[idx].status = status;
+  writeOrders(orders);
+  return orders[idx];
+}
+
+export function updateOrderDiscount(id: string, discountApplied: number): OrderRecord | undefined {
+  const orders = readOrders();
+  const idx = orders.findIndex((o) => o.id === id);
+  if (idx === -1) return undefined;
+
+  const subtotal = computeSubtotal(orders[idx].items);
+  const raw = Number(discountApplied) || 0;
+  const nextDiscount = Math.max(0, Math.min(Math.round(raw), subtotal));
+
+  orders[idx].discountApplied = nextDiscount;
+  orders[idx].total = Math.max(0, subtotal - nextDiscount);
   writeOrders(orders);
   return orders[idx];
 }
@@ -155,6 +189,41 @@ export async function getAllOrdersAsync(): Promise<OrderRecord[]> {
   if (!isDbAvailable()) return getAllOrders();
   const { rows } = await query<any>('SELECT id, user_id as "userId", total, currency, status, payment_method as "paymentMethod", coupon_code as "couponCode", discount_applied as "discountApplied", admin_confirmed as "adminConfirmed", created_at as "createdAt" FROM orders ORDER BY created_at DESC');
   return rows;
+}
+
+export async function getOrderDetailsByIdAsync(id: string): Promise<OrderDetails | undefined> {
+  if (!isDbAvailable()) return getOrderDetailsById(id);
+
+  const orderRes = await query<any>(
+    'SELECT id, user_id as "userId", total, currency, status, payment_method as "paymentMethod", coupon_code as "couponCode", discount_applied as "discountApplied", admin_confirmed as "adminConfirmed", created_at as "createdAt" FROM orders WHERE id=$1 LIMIT 1',
+    [id]
+  );
+  const order = orderRes.rows?.[0];
+  if (!order) return undefined;
+
+  const itemsRes = await query<any>(
+    'SELECT product_id as "productId", quantity, price FROM order_items WHERE order_id=$1 ORDER BY id ASC',
+    [id]
+  );
+  const items = (itemsRes.rows || []) as OrderItem[];
+  const subtotal = computeSubtotal(items);
+  return { ...(order as any), items, subtotal } as OrderDetails;
+}
+
+export async function updateOrderDiscountAsync(id: string, discountApplied: number): Promise<OrderRecord | undefined> {
+  if (!isDbAvailable()) return updateOrderDiscount(id, discountApplied);
+
+  const itemsRes = await query<any>('SELECT COALESCE(SUM(quantity * price),0) as subtotal FROM order_items WHERE order_id=$1', [id]);
+  const subtotal = Number(itemsRes.rows?.[0]?.subtotal) || 0;
+  const raw = Number(discountApplied) || 0;
+  const nextDiscount = Math.max(0, Math.min(Math.round(raw), subtotal));
+  const nextTotal = Math.max(0, subtotal - nextDiscount);
+
+  const { rows } = await query<any>(
+    'UPDATE orders SET discount_applied=$2, total=$3 WHERE id=$1 RETURNING id, user_id as "userId", total, currency, status, payment_method as "paymentMethod", coupon_code as "couponCode", discount_applied as "discountApplied", admin_confirmed as "adminConfirmed", created_at as "createdAt"',
+    [id, nextDiscount, nextTotal]
+  );
+  return rows[0];
 }
 
 export async function updateOrderStatusAsync(id: string, status: OrderRecord['status']): Promise<OrderRecord | undefined> {

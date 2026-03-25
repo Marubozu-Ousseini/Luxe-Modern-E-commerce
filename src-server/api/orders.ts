@@ -8,10 +8,33 @@ const router = Router();
 
 router.use(requireAuth);
 
+
 router.get('/me', async (req, res) => {
   const userId = req.user!.id;
   const orders = isDbAvailable() ? await getOrdersByUserAsync(userId) : getOrdersByUser(userId);
-  return res.json(orders);
+  // Add product names to each order's items
+  let products: any[] = [];
+  try {
+    const { getAllProducts, getAllProductsAsync, isProductsPersistenceAvailable } = await import('../services/produitService.js');
+    products = isProductsPersistenceAvailable() ? await getAllProductsAsync() : getAllProducts();
+  } catch {}
+  const productById = new Map(products.map((p: any) => [p.id, p]));
+  // Get user address (town) from userService
+  let userTown = "";
+  try {
+    const { findUserById } = await import('../services/userService.js');
+    const user = findUserById(userId);
+    userTown = user?.town || "";
+  } catch {}
+  const hydrated = (Array.isArray(orders) ? orders : []).map((order: any) => ({
+    ...order,
+    address: order.address || order.town || userTown,
+    items: (order.items || []).map((it: any) => ({
+      ...it,
+      name: productById.get(it.productId)?.name || `Produit ${it.productId}`,
+    })),
+  }));
+  return res.json(hydrated);
 });
 
 router.post('/', async (req, res) => {

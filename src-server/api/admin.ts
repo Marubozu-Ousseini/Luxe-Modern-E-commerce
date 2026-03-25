@@ -23,6 +23,7 @@ import {
   updateOrderStatusAsync
   , confirmOrderShipmentAsync
 } from '../services/orderService.js';
+import { getOrderDetailsById, getOrderDetailsByIdAsync, updateOrderDiscount, updateOrderDiscountAsync } from '../services/orderService.js';
 import {
   getAllUsersSanitized,
   setUserRole,
@@ -34,7 +35,9 @@ import {
   setUserPasswordAsync,
   verifyPassword,
   findUserByEmail,
-  findUserByEmailAsync
+  findUserByEmailAsync,
+  findUserById,
+  findUserByIdAsync
 } from '../services/userService.js';
 import { getHeroImagesMap, setHeroImagesMap } from '../services/heroImagesGcsService.js';
 import { getSiteSettings, setSiteSettings } from '../services/siteSettingsGcsService.js';
@@ -555,7 +558,109 @@ router.get('/categories', async (_req, res) => {
 // === Orders (admin) ===
 router.get('/orders', async (_req, res) => {
   const orders = isDbAvailable() ? await getAllOrdersAsync() : getAllOrders();
-  return res.json(orders);
+
+  try {
+    const userIds = Array.from(
+      new Set(
+        (Array.isArray(orders) ? orders : [])
+          .map((o: any) => String(o?.userId || '').trim())
+          .filter(Boolean)
+      )
+    );
+
+    const pairs = await Promise.all(
+      userIds.map(async (id) => {
+        let user: any = undefined;
+        try {
+          user = await findUserByIdAsync(id);
+        } catch {
+          user = undefined;
+        }
+        if (!user) {
+          try {
+            user = findUserById(id);
+          } catch {
+            user = undefined;
+          }
+        }
+        if (!user && id.includes('@')) {
+          try {
+            user = await findUserByEmailAsync(id);
+          } catch {
+            user = undefined;
+          }
+          if (!user) {
+            try {
+              user = findUserByEmail(id);
+            } catch {
+              user = undefined;
+            }
+          }
+        }
+        return [id, user] as const;
+      })
+    );
+
+    const usersById = new Map<string, any>(pairs);
+    const hydrated = (Array.isArray(orders) ? orders : []).map((o: any) => {
+      const id = String(o?.userId || '').trim();
+      const user = usersById.get(id);
+      return {
+        ...o,
+        customerName: user?.name || null,
+        customerPhone: user?.phone || null,
+        customerTown: user?.town || null,
+      };
+    });
+
+    return res.json(hydrated);
+  } catch {
+    // If user lookup fails for any reason, still return the raw orders.
+    return res.json(orders);
+  }
+});
+
+router.get('/orders/:id', async (req, res) => {
+  const id = String(req.params.id);
+  const order = isDbAvailable() ? await getOrderDetailsByIdAsync(id) : getOrderDetailsById(id);
+  if (!order) return res.status(404).json({ message: 'Commande introuvable' });
+
+  try {
+    const userId = String((order as any)?.userId || '').trim();
+    let user: any = undefined;
+    try {
+      user = await findUserByIdAsync(userId);
+    } catch {
+      user = undefined;
+    }
+    if (!user) {
+      try {
+        user = findUserById(userId);
+      } catch {
+        user = undefined;
+      }
+    }
+    // Add product names to items
+    let products: any[] = [];
+    try {
+      const { getAllProducts, getAllProductsAsync, isProductsPersistenceAvailable } = await import('../services/produitService.js');
+      products = isProductsPersistenceAvailable() ? await getAllProductsAsync() : getAllProducts();
+    } catch {}
+    const productById = new Map(products.map((p: any) => [p.id, p]));
+    const itemsWithNames = (order.items || []).map((it: any) => ({
+      ...it,
+      name: productById.get(it.productId)?.name || `Produit ${it.productId}`,
+    }));
+    return res.json({
+      ...order,
+      items: itemsWithNames,
+      customerName: user?.name || null,
+      customerPhone: user?.phone || null,
+      customerTown: user?.town || null,
+    });
+  } catch {
+    return res.json(order);
+  }
 });
 
 router.patch('/orders/:id', async (req, res) => {
@@ -564,6 +669,19 @@ router.patch('/orders/:id', async (req, res) => {
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ message: 'Statut invalide' });
   const updated = isDbAvailable() ? await updateOrderStatusAsync(id, parsed.data.status) : updateOrderStatus(id, parsed.data.status);
+  if (!updated) return res.status(404).json({ message: 'Commande introuvable' });
+  return res.json(updated);
+});
+
+router.patch('/orders/:id/discount', async (req, res) => {
+  const id = String(req.params.id);
+  const schema = z.object({ discountApplied: z.number().int().min(0) });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: 'Remise invalide' });
+
+  const updated = isDbAvailable()
+    ? await updateOrderDiscountAsync(id, parsed.data.discountApplied)
+    : updateOrderDiscount(id, parsed.data.discountApplied);
   if (!updated) return res.status(404).json({ message: 'Commande introuvable' });
   return res.json(updated);
 });

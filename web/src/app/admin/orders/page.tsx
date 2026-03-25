@@ -9,11 +9,15 @@ type OrderItem = {
   productId: number;
   quantity: number;
   price: number;
+  name?: string;
 };
 
 type AdminOrder = {
   id: string;
   userId: string;
+  customerName?: string | null;
+  customerPhone?: string | null;
+  customerTown?: string | null;
   items?: OrderItem[];
   total: number;
   currency?: string;
@@ -23,6 +27,7 @@ type AdminOrder = {
   discountApplied?: number;
   adminConfirmed?: boolean;
   createdAt?: string;
+  subtotal?: number;
 };
 
 function formatDate(value?: string) {
@@ -48,6 +53,11 @@ export default function AdminOrdersPage() {
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string>("");
   const [authRequired, setAuthRequired] = useState(false);
+
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [detailsById, setDetailsById] = useState<Record<string, AdminOrder>>({});
+  const [detailsLoadingId, setDetailsLoadingId] = useState<string | null>(null);
+  const [discountDraftById, setDiscountDraftById] = useState<Record<string, string>>({});
 
   const [filterStatus, setFilterStatus] = useState<OrderStatus | "all">("all");
   const [query, setQuery] = useState<string>("");
@@ -141,6 +151,50 @@ export default function AdminOrdersPage() {
     if (!res.ok) throw new Error(body?.message || "Impossible de mettre à jour la commande.");
     const updated = body as AdminOrder;
     setItems((prev) => prev.map((o) => (o.id === id ? updated : o)));
+  }
+
+  async function fetchDetails(id: string) {
+    setDetailsLoadingId(id);
+    try {
+      const headers = await getAdminAuthHeaders();
+      const res = await fetch(`/api/admin/orders/${encodeURIComponent(id)}`, { headers, credentials: "include" });
+      if (res.status === 401 || res.status === 403) {
+        setAuthRequired(true);
+        throw new Error("Authentification admin requise.");
+      }
+      const body = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(body?.message || "Impossible de charger les détails.");
+      const detailed = body as AdminOrder;
+      setDetailsById((prev) => ({ ...prev, [id]: detailed }));
+      setDiscountDraftById((prev) => ({ ...prev, [id]: String((detailed as any)?.discountApplied ?? 0) }));
+    } finally {
+      setDetailsLoadingId((prev) => (prev === id ? null : prev));
+    }
+  }
+
+  async function saveDiscount(id: string) {
+    const draft = discountDraftById[id] ?? "0";
+    const discountApplied = Math.max(0, Math.round(Number(draft) || 0));
+    const headers = await getAdminAuthHeaders({ "Content-Type": "application/json" });
+    const res = await fetch(`/api/admin/orders/${encodeURIComponent(id)}/discount`, {
+      method: "PATCH",
+      headers,
+      credentials: "include",
+      body: JSON.stringify({ discountApplied }),
+    });
+    if (res.status === 401 || res.status === 403) {
+      setAuthRequired(true);
+      throw new Error("Authentification admin requise.");
+    }
+    const body = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(body?.message || "Impossible d'appliquer la remise.");
+    const updated = body as AdminOrder;
+    setItems((prev) => prev.map((o) => (o.id === id ? { ...o, ...updated } : o)));
+    setDetailsById((prev) => {
+      const current = prev[id];
+      if (!current) return prev;
+      return { ...prev, [id]: { ...current, ...updated } };
+    });
   }
 
   async function confirmShipment(id: string) {
@@ -243,47 +297,179 @@ export default function AdminOrdersPage() {
 
               {!loading &&
                 visible.map((o) => (
-                  <tr key={o.id} className="border-b last:border-b-0">
-                    <td className="px-4 py-3 font-medium">{o.id}</td>
-                    <td className="px-4 py-3">{o.userId}</td>
-                    <td className="px-4 py-3">{formatDate(o.createdAt)}</td>
-                    <td className="px-4 py-3">{formatXaf(o.total)}</td>
-                    <td className="px-4 py-3">{o.paymentMethod || "—"}</td>
-                    <td className="px-4 py-3">
-                      <span className="mr-2 inline-flex items-center rounded-full border px-2 py-0.5 text-xs">
-                        {statusLabel(o.status)}
-                      </span>
-                      {o.adminConfirmed ? (
-                        <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs">Expédition confirmée</span>
-                      ) : null}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <select
-                          className="h-9 rounded-md border bg-background px-2 text-sm"
-                          value={o.status}
-                          onChange={(e) => {
-                            const next = e.target.value as OrderStatus;
-                            void updateStatus(o.id, next).catch((err) => setLoadError(String(err?.message || err)));
-                          }}
-                        >
-                          <option value="paid">Payée</option>
-                          <option value="pending">En attente</option>
-                          <option value="failed">Échouée</option>
-                        </select>
+                  <>
+                    <tr key={o.id} className="border-b last:border-b-0">
+                      <td className="px-4 py-3 font-medium">{o.id}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col">
+                          <span>{o.customerName || o.userId}</span>
+                          {o.customerPhone ? <span className="text-xs text-muted-foreground">{o.customerPhone}</span> : null}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">{formatDate(o.createdAt)}</td>
+                      <td className="px-4 py-3">{formatXaf(o.total)}</td>
+                      <td className="px-4 py-3">{o.paymentMethod || "—"}</td>
+                      <td className="px-4 py-3">
+                        <span className="mr-2 inline-flex items-center rounded-full border px-2 py-0.5 text-xs">
+                          {statusLabel(o.status)}
+                        </span>
+                        {o.adminConfirmed ? (
+                          <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs">Expédition confirmée</span>
+                        ) : null}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            className="h-9 rounded-md border px-3 text-sm"
+                            onClick={async () => {
+                              const next = expandedId === o.id ? null : o.id;
+                              setExpandedId(next);
+                              if (next && !detailsById[o.id]) {
+                                // Show details immediately, keep loading state until fetch completes
+                                setDetailsById((prev) => ({ ...prev, [o.id]: prev[o.id] || {} }));
+                                try {
+                                  await fetchDetails(o.id);
+                                } catch (err) {
+                                  setLoadError(String((err && (err as any).message) || err || 'Erreur de chargement'));
+                                }
+                              }
+                            }}
+                          >
+                            Détails
+                          </button>
 
-                        <button
-                          className="h-9 rounded-md border px-3 text-sm"
-                          disabled={Boolean(o.adminConfirmed)}
-                          onClick={() => {
-                            void confirmShipment(o.id).catch((err) => setLoadError(String(err?.message || err)));
-                          }}
-                        >
-                          Confirmer expédition
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
+                          <select
+                            className="h-9 rounded-md border bg-background px-2 text-sm"
+                            value={o.status}
+                            onChange={(e) => {
+                              const next = e.target.value as OrderStatus;
+                              void updateStatus(o.id, next).catch((err) => setLoadError(String(err?.message || err)));
+                            }}
+                          >
+                            <option value="paid">Payée</option>
+                            <option value="pending">En attente</option>
+                            <option value="failed">Échouée</option>
+                          </select>
+
+                          <button
+                            className="h-9 rounded-md border px-3 text-sm"
+                            disabled={Boolean(o.adminConfirmed)}
+                            onClick={() => {
+                              void confirmShipment(o.id).catch((err) => setLoadError(String(err?.message || err)));
+                            }}
+                          >
+                            Confirmer expédition
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+
+                    {expandedId === o.id ? (
+                      <tr className="border-b last:border-b-0">
+                        <td colSpan={7} className="px-4 py-4">
+                          {detailsLoadingId === o.id ? (
+                            <div className="text-sm text-muted-foreground">Chargement des détails…</div>
+                          ) : null}
+
+                          {detailsById[o.id] ? (
+                            <div className="grid gap-4 rounded-md border bg-muted/10 p-4">
+                              <div className="grid gap-1 text-sm">
+                                <div>
+                                  <span className="text-muted-foreground">Client: </span>
+                                  <span className="font-medium">{detailsById[o.id].customerName || detailsById[o.id].userId}</span>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground">Téléphone: </span>
+                                  <span className="font-medium">{detailsById[o.id].customerPhone || "—"}</span>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground">Ville: </span>
+                                  <span className="font-medium">{detailsById[o.id].customerTown || "—"}</span>
+                                </div>
+                              </div>
+
+                              <div className="overflow-x-auto">
+                                <table className="min-w-full text-sm">
+                                  <thead className="border-b">
+                                    <tr className="text-left">
+                                      <th className="py-2 pr-4 font-medium">Produit</th>
+                                      <th className="py-2 pr-4 font-medium">Qté</th>
+                                      <th className="py-2 pr-4 font-medium">Prix</th>
+                                      <th className="py-2 pr-4 font-medium">Total</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {(detailsById[o.id].items || []).map((it, idx) => (
+                                      <tr key={`${it.productId}-${idx}`} className="border-b last:border-b-0">
+                                        <td className="py-2 pr-4">{it.name ? `${it.name} (#${it.productId})` : `#${it.productId}`}</td>
+                                        <td className="py-2 pr-4">{it.quantity}</td>
+                                        <td className="py-2 pr-4">{formatXaf(it.price)}</td>
+                                        <td className="py-2 pr-4">{formatXaf(it.price * it.quantity)}</td>
+                                      </tr>
+                                    ))}
+                                    {(detailsById[o.id].items || []).length === 0 ? (
+                                      <tr>
+                                        <td colSpan={4} className="py-3 text-muted-foreground">
+                                          Aucun article (détails indisponibles).
+                                        </td>
+                                      </tr>
+                                    ) : null}
+                                  </tbody>
+                                </table>
+                              </div>
+
+                              <div className="grid gap-3 sm:grid-cols-2">
+                                <div className="grid gap-1 text-sm">
+                                  <div>
+                                    <span className="text-muted-foreground">Sous-total: </span>
+                                    <span className="font-medium">{formatXaf(Number(detailsById[o.id].subtotal ?? 0))}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-muted-foreground">Remise appliquée: </span>
+                                    <span className="font-medium">{formatXaf(Number(detailsById[o.id].discountApplied ?? 0))}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-muted-foreground">Total: </span>
+                                    <span className="font-medium">{formatXaf(Number(detailsById[o.id].total ?? 0))}</span>
+                                  </div>
+                                </div>
+
+                                <div className="grid gap-2">
+                                  <label className="text-sm font-medium">Ajouter / modifier remise (XAF)</label>
+                                  <div className="flex gap-2">
+                                    <input
+                                      className="h-9 w-40 rounded-md border bg-background px-3 text-sm"
+                                      type="number"
+                                      min={0}
+                                      step={1}
+                                      value={discountDraftById[o.id] ?? "0"}
+                                      onChange={(e) =>
+                                        setDiscountDraftById((prev) => ({
+                                          ...prev,
+                                          [o.id]: e.target.value,
+                                        }))
+                                      }
+                                    />
+                                    <button
+                                      className="h-9 rounded-md border px-3 text-sm"
+                                      onClick={() => {
+                                        void saveDiscount(o.id).catch((err) => setLoadError(String(err?.message || err)));
+                                      }}
+                                    >
+                                      Appliquer
+                                    </button>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground">
+                                    La remise est plafonnée automatiquement au sous-total.
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          ) : null}
+                        </td>
+                      </tr>
+                    ) : null}
+                  </>
                 ))}
             </tbody>
           </table>

@@ -38,6 +38,7 @@ export default function ShopPage() {
     };
   }, []);
 
+  // By default, show all products (no filters applied)
   const [filters, setFilters] = useState<Filters>(emptyFilters);
   const [sort, setSort] = useState<SortKey>("curated");
   const [visible, setVisible] = useState(8);
@@ -64,6 +65,19 @@ export default function ShopPage() {
   }, []);
 
   const filtered = useMemo(() => {
+    // If no filters, show all products
+    if (
+      filters.materials.length === 0 &&
+      filters.colors.length === 0 &&
+      filters.sizes.length === 0 &&
+      filters.fit.length === 0
+    ) {
+      const sorted = [...products];
+      if (sort === "price") sorted.sort((a, b) => a.priceXaf - b.priceXaf);
+      else if (sort === "newest") sorted.reverse();
+      return sorted;
+    }
+    // Otherwise, apply filters
     const base = products.filter((p) => {
       const matOk = filters.materials.length === 0 || filters.materials.some((m) => p.materials.includes(m));
       const colorOk = filters.colors.length === 0 || filters.colors.some((c) => p.colors.includes(c));
@@ -71,13 +85,11 @@ export default function ShopPage() {
       const fitOk = filters.fit.length === 0 || filters.fit.includes(p.fit);
       return matOk && colorOk && sizeOk && fitOk;
     });
-
     const sorted = [...base];
     if (sort === "price") sorted.sort((a, b) => a.priceXaf - b.priceXaf);
     else if (sort === "newest") sorted.reverse();
-
     return sorted;
-  }, [filters, sort]);
+  }, [products, filters, sort]);
 
   const shown = filtered.slice(0, visible);
   const canLoad = visible < filtered.length;

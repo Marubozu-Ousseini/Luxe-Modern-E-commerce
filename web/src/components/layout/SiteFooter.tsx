@@ -61,7 +61,7 @@ export function SiteFooter() {
 
           <div className="flex items-center gap-3">
             <a
-              href="https://instagram.com/malafaareh"
+              href="https://www.instagram.com/malafaareh?igsh=MTZldzBwcDJ2MXU3Ng%3D%3D&utm_source=qr"
               target="_blank"
               rel="noreferrer"
               aria-label="Instagram"
@@ -70,7 +70,7 @@ export function SiteFooter() {
               <IconInstagram className="h-5 w-5" />
             </a>
             <a
-              href="https://facebook.com/malafaareh"
+              href="https://www.facebook.com/share/18Tpqop2U8/?mibextid=wwXIfr"
               target="_blank"
               rel="noreferrer"
               aria-label="Facebook"
@@ -88,7 +88,7 @@ export function SiteFooter() {
               <IconWhatsapp className="h-5 w-5" />
             </a>
             <a
-              href="https://snapchat.com"
+              href="https://snapchat.com/t/4uyMYDes"
               target="_blank"
               rel="noreferrer"
               aria-label="Snapchat"
@@ -97,7 +97,7 @@ export function SiteFooter() {
               <IconSnapchat className="h-5 w-5" />
             </a>
             <a
-              href="https://tiktok.com/@malafaareh"
+              href="https://www.tiktok.com/@malafaareh1?_r=1&_t=ZS-93qzXpICXgu"
               target="_blank"
               rel="noreferrer"
               aria-label="TikTok"

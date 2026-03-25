@@ -279,19 +279,19 @@ const App: React.FC = () => {
             <div>
               <h4 className="font-semibold mb-2">Réseaux sociaux</h4>
               <div className="flex items-center gap-3">
-                <a href="https://instagram.com" aria-label="Instagram" className="p-2 rounded bg-white/70 hover:bg-white shadow-soft hover:shadow-lg transition">
+                <a href="https://www.instagram.com/malafaareh?igsh=MTZldzBwcDJ2MXU3Ng%3D%3D&utm_source=qr" aria-label="Instagram" className="p-2 rounded bg-white/70 hover:bg-white shadow-soft hover:shadow-lg transition">
                   <img src="/icons/instagram.svg" alt="Instagram" className="h-5 w-5" />
                 </a>
-                <a href="https://tiktok.com" aria-label="TikTok" className="p-2 rounded bg-white/70 hover:bg-white shadow-soft hover:shadow-lg transition">
+                <a href="https://www.tiktok.com/@malafaareh1?_r=1&_t=ZS-93qzXpICXgu" aria-label="TikTok" className="p-2 rounded bg-white/70 hover:bg-white shadow-soft hover:shadow-lg transition">
                   <img src="/icons/tiktok.svg" alt="TikTok" className="h-5 w-5" />
                 </a>
-                <a href="https://facebook.com" aria-label="Facebook" className="p-2 rounded bg-white/70 hover:bg-white shadow-soft hover:shadow-lg transition">
+                <a href="https://www.facebook.com/share/18Tpqop2U8/?mibextid=wwXIfr" aria-label="Facebook" className="p-2 rounded bg-white/70 hover:bg-white shadow-soft hover:shadow-lg transition">
                   <img src="/icons/facebook.svg" alt="Facebook" className="h-5 w-5" />
                 </a>
                 <a href="https://wa.me/" aria-label="WhatsApp" className="p-2 rounded bg-white/70 hover:bg-white shadow-soft hover:shadow-lg transition">
                   <img src="/icons/whatsapp.svg" alt="WhatsApp" className="h-5 w-5" />
                 </a>
-                <a href="https://snapchat.com" aria-label="Snapchat" className="p-2 rounded bg-white/70 hover:bg-white shadow-soft hover:shadow-lg transition">
+                <a href="https://snapchat.com/t/4uyMYDes" aria-label="Snapchat" className="p-2 rounded bg-white/70 hover:bg-white shadow-soft hover:shadow-lg transition">
                   <img src="/icons/snapchat.svg" alt="Snapchat" className="h-5 w-5" />
                 </a>
               </div>

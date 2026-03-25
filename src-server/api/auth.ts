@@ -3,6 +3,7 @@ import cookieParser from 'cookie-parser';
 import { logger } from '../config/logger.js';
 import { initFirebaseAdmin, getFirebaseAdmin } from '../middleware/firebaseAdminInit.js';
 import { isDbAvailable } from '../services/db.js';
+import { z } from 'zod';
 import { createUser, findUserByEmail, verifyPassword, createUserAsync, findUserByEmailAsync, findUserByPhone, findUserByPhoneAsync } from '../services/userService.js';
 import { upsertFirebaseUserAsync } from '../services/userUpsert.js';
 import { signToken, cookieOptions, requireAuth } from '../middleware/auth.js';
@@ -88,6 +89,61 @@ router.post('/logout', (_req, res) => {
 router.get('/me', requireAuth, (req, res) => {
   if (!req.user) return res.status(401).json({ message: 'Non authentifié' });
   return res.json({ id: req.user.id, email: req.user.email, role: req.user.role });
+});
+
+// PATCH /api/auth/me -> update profile safely (no conflicts)
+// - By default, phone/town are only set if missing.
+// - To overwrite an existing phone, pass { forcePhone: true }.
+router.patch('/me', requireAuth, async (req, res) => {
+  try {
+    if (!req.user) return res.status(401).json({ message: 'Non authentifié' });
+
+    const schema = z.object({
+      name: z.string().trim().min(1).max(80).optional(),
+      phone: z.string().trim().min(7).max(32).optional(),
+      town: z.string().trim().min(1).max(80).optional(),
+      forcePhone: z.boolean().optional(),
+      forceTown: z.boolean().optional(),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: 'Champs invalides', details: parsed.error.flatten() });
+    }
+
+    const email = String(req.user.email || '').trim().toLowerCase();
+    if (!email) return res.status(400).json({ message: 'Email manquant sur la session' });
+
+    const existing = await findUserByEmailAsync(email);
+
+    const nextName = parsed.data.name;
+    const requestedPhone = parsed.data.phone ? String(parsed.data.phone).trim() : undefined;
+    const requestedTown = parsed.data.town ? String(parsed.data.town).trim() : undefined;
+
+    const hasPhone = Boolean(String((existing as any)?.phone || '').trim());
+    const hasTown = Boolean(String((existing as any)?.town || '').trim());
+
+    const allowPhone = Boolean(parsed.data.forcePhone) || !hasPhone;
+    const allowTown = Boolean(parsed.data.forceTown) || !hasTown;
+
+    const updated = await upsertFirebaseUserAsync(
+      req.user.id,
+      email,
+      nextName,
+      req.user.role,
+      allowPhone ? requestedPhone : undefined,
+      allowTown ? requestedTown : undefined
+    );
+
+    // Refresh cookie JWT so cookie-auth stays consistent with any changes.
+    const token = signToken({ id: updated.id, email: updated.email, role: updated.role });
+    res.cookie('token', token, cookieOptions());
+
+    const { passwordHash, ...safe } = updated as any;
+    return res.status(200).json(safe);
+  } catch (e: any) {
+    logger.error('[auth] patch /me failed', e?.message || e);
+    return res.status(500).json({ message: e?.message || 'Erreur interne du serveur' });
+  }
 });
 
 // Expose minimal Firebase client config for runtime initialization of the frontend.
