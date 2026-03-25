@@ -39,7 +39,7 @@ export default function CheckoutPage() {
   const [voucherCode, setVoucherCode] = useState("");
   const [appliedVoucher, setAppliedVoucher] = useState<{ code: string; discount: number } | null>(null);
   const [voucherError, setVoucherError] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("orange_money");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("mtn_mobile_money");
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [savedToHistory, setSavedToHistory] = useState(false);
   const [placingOrder, setPlacingOrder] = useState(false);
@@ -389,7 +389,9 @@ export default function CheckoutPage() {
                     <h2 className="font-serif text-2xl tracking-tight-luxe-sm">Paiement</h2>
                     <div className="mt-5 space-y-3">
                       <label className="flex items-center justify-between rounded-card border border-border-soft bg-bg-subtle px-4 py-3 text-sm">
-                        <span className="text-text-primary">Orange Money</span>
+                        <span className="text-text-primary">
+                          Orange Money <span className="text-text-muted">(currently unavailable)</span>
+                        </span>
                         <input
                           type="radio"
                           name="payment"
@@ -399,7 +401,9 @@ export default function CheckoutPage() {
                         />
                       </label>
                       <label className="flex items-center justify-between rounded-card border border-border-soft bg-bg-subtle px-4 py-3 text-sm">
-                        <span className="text-text-primary">MTN Mobile Money</span>
+                        <span className="text-text-primary">
+                          MTN Mobile Money <span className="text-text-muted">(+237 6 52 00 35 36)</span>
+                        </span>
                         <input
                           type="radio"
                           name="payment"

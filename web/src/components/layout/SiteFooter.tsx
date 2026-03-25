@@ -79,7 +79,7 @@ export function SiteFooter() {
               <IconFacebook className="h-5 w-5" />
             </a>
             <a
-              href="https://wa.me/"
+              href="https://wa.me/237652003536"
               target="_blank"
               rel="noreferrer"
               aria-label="WhatsApp"
